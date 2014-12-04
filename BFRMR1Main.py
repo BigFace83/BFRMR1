@@ -450,7 +450,7 @@ while True:
 
     while RunExplore is True:
 
-        MoveDistance = 255
+        MoveDistance = 250
         if ScreenCounter is EXPLORESCREEN: #Only write to screen if on Explore screen
             BFRMR1tft.EditExploreScreen(1,ROBOTFORWARD,0)
         RobotData = RobotMove(ROBOTFORWARD,MoveDistance,AutoSpeed, SonarThreshold, IRThreshold)
