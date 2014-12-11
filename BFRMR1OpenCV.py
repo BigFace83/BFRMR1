@@ -57,13 +57,22 @@ def DetectEdges():
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
 
     imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
+    imgGray = cv2.blur(imgGray,(5,5))
     imgEdge = cv2.Canny(imgGray, 30, 200) #edge detection
 
+    ObstacleArray = []
+    for j in range (imgEdge.shape[1]-1): #width of numpy array
+        for i in range((imgEdge.shape[0]-1),0,-1): #height of array
+            if imgEdge.item(i,j) == 255:
+                ObstacleArray.append((j,i))
+                break #if pixel of value 255 is encountered, skip rest of pixels in column
+        
+    for x in range (len(ObstacleArray)-1):
+        cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),5) 
 
+    
 
-
-
-    cv2.imshow("camera", imgEdge)
+    cv2.imshow("camera", img)
     cv2.waitKey(120)
 
 
