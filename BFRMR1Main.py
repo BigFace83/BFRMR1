@@ -29,6 +29,7 @@ RunFindFood = False
 RunExplore = False
 ViewData = False
 TurnRatio = 3.4
+RunForwardScan = False
 
 ScreenCounter = 0
 PointerCounterMain = 0
@@ -180,6 +181,7 @@ def MoveReverse():
     RobotData = RobotMove(ROBOTREVERSE,50,AutoSpeed, 0, 255) #no sonar or IR threshold so move always completes
     print RobotData
 
+
 ########################################################################################
 #
 # FindFoodTargets
@@ -299,6 +301,7 @@ def Button2Pressed(channel):
     global RunFindFood
     global RunExplore
     global ViewData
+    global RunForwardScan
 
     if ScreenCounter is TESTMOVESCREEN:
         if PointerCounterTest is 0:
@@ -309,6 +312,8 @@ def Button2Pressed(channel):
             MoveForward()
         if PointerCounterTest is 3:
             MoveReverse()
+        if PointerCounterTest is 4:
+            RunForwardScan = True
 
     if ScreenCounter is MAINSCREEN:
         if PointerCounterMain is 0:
@@ -346,6 +351,7 @@ def Button3Pressed(channel):
     global RunFindFood
     global RunExplore
     global ViewData
+    global RunForwardScan
     if ScreenCounter is FINDFOODSCREEN:
         ScreenCounter = STOPPINGSCREEN
         BFRMR1tft.StoppingScreen()
@@ -364,6 +370,8 @@ def Button3Pressed(channel):
     if ScreenCounter is TESTMOVESCREEN:
         ScreenCounter = MAINSCREEN
         BFRMR1tft.MainScreen()
+        BFRMR1tft.EditMainScreen(PointerCounterMain)
+        RunForwardScan = False
 
 
 
@@ -526,6 +534,28 @@ while True:
             ScreenCounter = MAINSCREEN
             BFRMR1tft.MainScreen()
             BFRMR1tft.EditMainScreen(PointerCounterMain)
+
+########################################################################################
+#
+# Sonar Scan routine. Scans area in front of robot with sonar sensor and returns map
+#
+########################################################################################
+
+    if RunForwardScan is True:
+        
+        
+        HeadTiltAngle = -20
+        for x in range(-30,31,30):
+            HeadPanAngle = x
+            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)
+            time.sleep(0.05) #small delay to let image settle
+            BFRMR1OpenCV.DetectEdges()
+            
+
+        RunForwardScan = False
+        ScreenCounter = MAINSCREEN
+        BFRMR1tft.MainScreen()
+        BFRMR1tft.EditMainScreen(PointerCounterMain)
 
 
 

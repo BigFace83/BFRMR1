@@ -7,7 +7,7 @@ import numpy
 import sys
 
 #filecounter = 0 #for saving files when required
-DisplayImage = False
+DisplayImage = True
 
 print "Starting OpenCV"
 capture = cv2.VideoCapture(0)
@@ -27,6 +27,44 @@ if DisplayImage is True:
     cv2.waitKey(200)
 
 
+##################################################################################################
+#
+# Display image - Capture a frame and display it on the screen
+#
+##################################################################################################
+def DisplayFrame():
+
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
+
+    cv2.imshow("camera", img)
+    cv2.waitKey(120)
+
+##################################################################################################
+#
+# Detect Edges - Capture a frame and edge detect before displaying
+#
+##################################################################################################
+def DetectEdges():
+
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
+
+    imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
+    imgEdge = cv2.Canny(imgGray, 30, 200) #edge detection
+
+
+
+
+
+    cv2.imshow("camera", imgEdge)
+    cv2.waitKey(120)
 
 
 ##################################################################################################

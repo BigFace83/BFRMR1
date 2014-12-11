@@ -339,25 +339,25 @@ def EditExploreScreen(StatusNumber,x,y):
     if StatusNumber is 0:
         FillRect(0,80,200,100,bColor) #clear area of screen
         if x is 0:
-            PutLine8x12("No Object", 25,80,BLACK)
+            PutLine8x12('No Object', 25,80,BLACK)
         if x is 1:
-            PutLine8x12("Object - Sonar Sensor", 25,80,BLACK)
+            PutLine8x12('Object - Sonar Sensor', 25,80,BLACK)
         if x is 2:
-            PutLine8x12("Object - Left IR Sensor", 25,80,BLACK)
+            PutLine8x12('Object - Left IR Sensor', 25,80,BLACK)
         if x is 3:
-            PutLine8x12("Object - Centre IR Sensor", 25,80,BLACK)
+            PutLine8x12('Object - Centre IR Sensor', 25,80,BLACK)
         if x is 4:
-            PutLine8x12("Object - Right IR Sensor", 25,80,BLACK)
+            PutLine8x12('Object - Right IR Sensor', 25,80,BLACK)
     if StatusNumber is 1:
         FillRect(0,100,200,200,bColor) #clear area of screen
         if x is 1:
-            PutLine8x12("Moving Forward",25,100,BLACK)
+            PutLine8x12('Moving Forward',25,100,BLACK)
         if x is 2:
-            PutLine8x12("Turning Left",25,100,BLACK)
+            PutLine8x12('Turning Left',25,100,BLACK)
         if x is 3:
-            PutLine8x12("Moving Right",25,100,BLACK)
+            PutLine8x12('Moving Right',25,100,BLACK)
         if x is 4:
-            PutLine8x12("Reversing",25,100,BLACK)
+            PutLine8x12('Reversing',25,100,BLACK)
     if StatusNumber is 2:
         
         FillRect(200,30,320,190,bColor)   
@@ -400,6 +400,7 @@ def TestMoveScreen():
     PutLine8x12('Turn 360',25,80,BLACK)
     PutLine8x12('Forward 50 Pulses',25,100,BLACK)
     PutLine8x12('Reverse 50 Pulses',25,120,BLACK)
+    PutLine8x12('Forward Scan', 25,140,BLACK)
     PutCh8x12('>',10,60,BLACK) #put > on first line when start screen is drawn
 
 def EditTestMoveScreen(PointerPos):
@@ -412,7 +413,8 @@ def EditTestMoveScreen(PointerPos):
         PutCh8x12('>',10,100,BLACK)
     if PointerPos is 3:
         PutCh8x12('>',10,120,BLACK)
-    
+    if PointerPos is 4:
+        PutCh8x12('>',10,140,BLACK)
 
 def StoppingScreen():
     ClearScreen()
