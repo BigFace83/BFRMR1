@@ -29,7 +29,7 @@ RunFindFood = False
 RunExplore = False
 ViewData = False
 TurnRatio = 3.4
-RunForwardScan = False
+RunForwardScan = True
 
 ScreenCounter = 0
 PointerCounterMain = 0
@@ -544,11 +544,11 @@ while True:
     while RunForwardScan is True:
         
         
-        HeadTiltAngle = -10
-        for x in range(-30,31,30):
+        HeadTiltAngle = -15
+        for x in range(-40,41,40):
             HeadPanAngle = x
             RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)
-            time.sleep(0.05) #small delay to let image settle
+            time.sleep(0.2) #small delay to let image settle
             BFRMR1OpenCV.DetectEdges()
             
 

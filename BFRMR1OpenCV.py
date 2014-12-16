@@ -53,6 +53,7 @@ def DisplayFrame():
 ##################################################################################################
 def DetectEdges():
 
+    StepSize = 10
     ret,img = capture.read()
     ret,img = capture.read()
     ret,img = capture.read()
@@ -64,7 +65,7 @@ def DetectEdges():
     imgEdge = cv2.Canny(imgGray, 30, 200) #edge detection
 
     ObstacleArray = []
-    for j in range (0,(imgEdge.shape[1]-1),10): #width of numpy array
+    for j in range (0,(imgEdge.shape[1]-1),StepSize): #width of numpy array
         for i in range((imgEdge.shape[0]-1),0,-1): #height of array
             if imgEdge.item(i,j) == 255:
                 ObstacleArray.append((j,i))
@@ -73,13 +74,14 @@ def DetectEdges():
             ObstacleArray.append((j,0)) #if nothing found, assume no obstacle. I may regret this decision!
             
     for x in range (len(ObstacleArray)-1):
-        cv2.line(img, (x*10,(imgEdge.shape[0]-1)), ObstacleArray[x],(0,255,0),1) 
+        cv2.line(img, (x*StepSize,(imgEdge.shape[0]-1)), ObstacleArray[x],(0,255,0),1) 
         cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),2) 
 
     
     if DisplayImage is True:
         cv2.imshow("camera", img)
-        #cv2.imshow("camera2", imgEdge)
+        cv2.waitKey(120)
+        cv2.imshow("camera2", imgGray)
         cv2.waitKey(120)
 
 
