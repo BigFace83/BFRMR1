@@ -16,13 +16,16 @@ capture.set(3,640) #1024 640
 capture.set(4,480) #600 480
 
 if DisplayImage is True:
-    cv2.namedWindow("camera", 0) 
+    cv2.namedWindow("camera", 0)
+    cv2.namedWindow("camera2", 0)
     print "Creating OpenCV windows"
     cv2.waitKey(200)
-    cv2.resizeWindow("camera", 300,300) 
+    cv2.resizeWindow("camera", 640,480) 
+    cv2.resizeWindow("camera2", 640,480) 
     print "Resizing OpenCV windows"
     cv2.waitKey(200)
-    cv2.moveWindow("camera", 500,30)
+    cv2.moveWindow("camera", 400,30)
+    cv2.moveWindow("camera2", 1100,30)
     print "Moving OpenCV window"
     cv2.waitKey(200)
 
@@ -57,23 +60,27 @@ def DetectEdges():
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
 
     imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
-    imgGray = cv2.blur(imgGray,(5,5))
+    imgGray = cv2.blur(imgGray,(3,3))
     imgEdge = cv2.Canny(imgGray, 30, 200) #edge detection
 
     ObstacleArray = []
-    for j in range (imgEdge.shape[1]-1): #width of numpy array
+    for j in range (0,(imgEdge.shape[1]-1),10): #width of numpy array
         for i in range((imgEdge.shape[0]-1),0,-1): #height of array
             if imgEdge.item(i,j) == 255:
                 ObstacleArray.append((j,i))
                 break #if pixel of value 255 is encountered, skip rest of pixels in column
-        
+        else: #no white pixel found
+            ObstacleArray.append((j,0)) #if nothing found, assume no obstacle. I may regret this decision!
+            
     for x in range (len(ObstacleArray)-1):
-        cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),5) 
+        cv2.line(img, (x*10,(imgEdge.shape[0]-1)), ObstacleArray[x],(0,255,0),1) 
+        cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),2) 
 
     
-
-    cv2.imshow("camera", img)
-    cv2.waitKey(120)
+    if DisplayImage is True:
+        cv2.imshow("camera", img)
+        #cv2.imshow("camera2", imgEdge)
+        cv2.waitKey(120)
 
 
 ##################################################################################################

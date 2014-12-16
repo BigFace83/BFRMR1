@@ -537,14 +537,14 @@ while True:
 
 ########################################################################################
 #
-# Sonar Scan routine. Scans area in front of robot with sonar sensor and returns map
+# Forward Scan routine. Scans area in front of robot with camera, looking for obstacles
 #
 ########################################################################################
 
-    if RunForwardScan is True:
+    while RunForwardScan is True:
         
         
-        HeadTiltAngle = -20
+        HeadTiltAngle = -10
         for x in range(-30,31,30):
             HeadPanAngle = x
             RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)
@@ -552,10 +552,10 @@ while True:
             BFRMR1OpenCV.DetectEdges()
             
 
-        RunForwardScan = False
-        ScreenCounter = MAINSCREEN
-        BFRMR1tft.MainScreen()
-        BFRMR1tft.EditMainScreen(PointerCounterMain)
+        if RunForwardScan is False:
+            ScreenCounter = MAINSCREEN
+            BFRMR1tft.MainScreen()
+            BFRMR1tft.EditMainScreen(PointerCounterMain)
 
 
 
