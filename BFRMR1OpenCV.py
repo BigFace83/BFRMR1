@@ -54,26 +54,26 @@ def DisplayFrame():
 def DetectEdges():
 
     StepSize = 10
-    ret,img = capture.read()
-    ret,img = capture.read()
-    ret,img = capture.read()
-    ret,img = capture.read()
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
+    ret,img = capture.read() 
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read() #5 seems to be enough
 
     imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
-    imgGray = cv2.blur(imgGray,(3,3))
-    imgEdge = cv2.Canny(imgGray, 30, 200) #edge detection
+    imgGray = cv2.blur(imgGray,(3,3))              #blur the image slightly to remove noise
+    imgEdge = cv2.Canny(imgGray, 30, 200)          #edge detection
 
     ObstacleArray = []
-    for j in range (0,(imgEdge.shape[1]-1),StepSize): #width of numpy array
-        for i in range((imgEdge.shape[0]-1),0,-1): #height of array
-            if imgEdge.item(i,j) == 255:
-                ObstacleArray.append((j,i))
-                break #if pixel of value 255 is encountered, skip rest of pixels in column
-        else: #no white pixel found
-            ObstacleArray.append((j,0)) #if nothing found, assume no obstacle. I may regret this decision!
+    for j in range (0,(imgEdge.shape[1]-1),StepSize):   #width of numpy array
+        for i in range((imgEdge.shape[0]-1),0,-1):      #step through every pixel in height of array from bottom to top
+            if imgEdge.item(i,j) == 255:                #check to see if the pixel is white which indicates an edge has been found
+                ObstacleArray.append((j,i))             #if it is, add x,y coordinates to ObstacleArray
+                break                                   #if white pixel is found, skip rest of pixels in column
+        else:                                           #no white pixel found
+            ObstacleArray.append((j,0))                 #if nothing found, assume no obstacle. I may regret this decision!
             
-    for x in range (len(ObstacleArray)-1):
+    for x in range (len(ObstacleArray)-1):              #draw lines between points in ObstacleArray
         cv2.line(img, (x*StepSize,(imgEdge.shape[0]-1)), ObstacleArray[x],(0,255,0),1) 
         cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),2) 
 
@@ -81,8 +81,8 @@ def DetectEdges():
     if DisplayImage is True:
         cv2.imshow("camera", img)
         cv2.waitKey(120)
-        cv2.imshow("camera2", imgGray)
-        cv2.waitKey(120)
+        #cv2.imshow("camera2", imgGray)
+        #cv2.waitKey(120)
 
 
 ##################################################################################################
