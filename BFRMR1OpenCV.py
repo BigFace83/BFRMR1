@@ -54,6 +54,11 @@ def DisplayFrame():
 def DetectEdges():
 
     StepSize = 10
+    SlopeChanges = []
+    ObstacleEdges = []
+    ObstacleArray = []
+    SlopePositive = False
+
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
     ret,img = capture.read() 
     ret,img = capture.read()
@@ -61,8 +66,9 @@ def DetectEdges():
     ret,img = capture.read() #5 seems to be enough
 
     imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
-    imgGray = cv2.blur(imgGray,(3,3))              #blur the image slightly to remove noise
-    imgEdge = cv2.Canny(imgGray, 30, 200)          #edge detection
+    imgGray = cv2.bilateralFilter(imgGray,9,80,80)
+    #imgGray = cv2.blur(imgGray,(4,4))              #blur the image slightly to remove noise
+    imgEdge = cv2.Canny(imgGray, 10, 100)          #edge detection
 
     ObstacleArray = []
     for j in range (0,(imgEdge.shape[1]-1),StepSize):   #width of numpy array
@@ -73,16 +79,45 @@ def DetectEdges():
         else:                                           #no white pixel found
             ObstacleArray.append((j,0))                 #if nothing found, assume no obstacle. I may regret this decision!
             
+    
     for x in range (len(ObstacleArray)-1):              #draw lines between points in ObstacleArray
         cv2.line(img, (x*StepSize,(imgEdge.shape[0]-1)), ObstacleArray[x],(0,255,0),1) 
         cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),2) 
+
+    #look for slope changes in ObstacleArray to try and find obstacles on the floor
+    for x in range (len(ObstacleArray)-1):
+        CurrentCoord = ObstacleArray[x]
+        CurrentX = CurrentCoord[1]
+        NextCoord = ObstacleArray[x+1]
+        NextX = NextCoord[1]
+        Difference = CurrentX - NextX
+        if Difference > 0: #positive slope
+            if SlopePositive is False:
+                if x is not 0: #ignore first point as this will always be logged
+                    if CurrentX > 240: #change of slope in lower half of image
+                        SlopeChanges.append(x)
+            SlopePositive = True
+        elif Difference < 0: #negative slope
+            if SlopePositive is True:
+                if x is not 0: #ignore first point as this will always be logged
+                    if CurrentX > 240: #change of slope in lower half of image
+                        SlopeChanges.append(x)
+            SlopePositive = False
+            
+    print SlopeChanges
+
+    for x in range (0,(len(SlopeChanges)),1):              
+        cv2.circle(img, ObstacleArray[SlopeChanges[x]], 5, (0,0,255),-1) #draw a circle at centre point of slope changes 
+    
+    
+
 
     
     if DisplayImage is True:
         cv2.imshow("camera", img)
         cv2.waitKey(120)
-        #cv2.imshow("camera2", imgGray)
-        #cv2.waitKey(120)
+        cv2.imshow("camera2", imgEdge)
+        cv2.waitKey(120)
 
 
 ##################################################################################################
