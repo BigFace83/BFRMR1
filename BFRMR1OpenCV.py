@@ -51,13 +51,14 @@ def DisplayFrame():
 # Detect Edges - Capture a frame and edge detect before displaying
 #
 ##################################################################################################
-def DetectEdges():
+def DetectObjects():
 
     StepSize = 10
     SlopeChanges = []
     ObstacleEdges = []
     ObstacleArray = []
     SlopePositive = False
+    EdgeFound = False
 
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
     ret,img = capture.read() 
@@ -71,8 +72,13 @@ def DetectEdges():
     imgEdge = cv2.Canny(imgGray, 10, 100)          #edge detection
 
     ObstacleArray = []
-    for j in range (0,(imgEdge.shape[1]-1),StepSize):   #width of numpy array
-        for i in range((imgEdge.shape[0]-1),0,-1):      #step through every pixel in height of array from bottom to top
+    imagewidth = imgEdge.shape[1] - 1
+    imageheight = imgEdge.shape[0] - 1
+    print "Image Width" ,imagewidth
+    print "Image Height" ,imageheight
+
+    for j in range (0,imagewidth,StepSize):   #width of numpy array
+        for i in range(imageheight,0,-1):      #step through every pixel in height of array from bottom to top
             if imgEdge.item(i,j) == 255:                #check to see if the pixel is white which indicates an edge has been found
                 ObstacleArray.append((j,i))             #if it is, add x,y coordinates to ObstacleArray
                 break                                   #if white pixel is found, skip rest of pixels in column
@@ -80,9 +86,10 @@ def DetectEdges():
             ObstacleArray.append((j,0))                 #if nothing found, assume no obstacle. I may regret this decision!
             
     
-    for x in range (len(ObstacleArray)-1):              #draw lines between points in ObstacleArray
-        cv2.line(img, (x*StepSize,(imgEdge.shape[0]-1)), ObstacleArray[x],(0,255,0),1) 
-        cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),2) 
+    for x in range (len(ObstacleArray)-1):              #draw lines between points in ObstacleArray 
+        cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),1) 
+    for x in range (len(ObstacleArray)):              #draw lines between points in ObstacleArray
+        cv2.line(img, (x*StepSize,imageheight), ObstacleArray[x],(0,255,0),1)  
 
     #look for slope changes in ObstacleArray to try and find obstacles on the floor
     for x in range (len(ObstacleArray)-1):
@@ -94,30 +101,60 @@ def DetectEdges():
         if Difference > 0: #positive slope
             if SlopePositive is False:
                 if x is not 0: #ignore first point as this will always be logged
-                    if CurrentX > 240: #change of slope in lower half of image
+                    if CurrentX > 260: #change of slope in lower half of image
                         SlopeChanges.append(x)
             SlopePositive = True
         elif Difference < 0: #negative slope
             if SlopePositive is True:
                 if x is not 0: #ignore first point as this will always be logged
-                    if CurrentX > 240: #change of slope in lower half of image
+                    if CurrentX > 260: #change of slope in lower half of image
                         SlopeChanges.append(x)
             SlopePositive = False
             
-    print SlopeChanges
+    print "Slope Changes", SlopeChanges
 
     for x in range (0,(len(SlopeChanges)),1):              
-        cv2.circle(img, ObstacleArray[SlopeChanges[x]], 5, (0,0,255),-1) #draw a circle at centre point of slope changes 
+        cv2.circle(img, ObstacleArray[SlopeChanges[x]], 2, (0,0,255),-1) #draw a circle at centre point of slope changes 
     
+    #to find egdes of each object
+    for x in range (0,(len(SlopeChanges)),1): #for each slope change
+        for y in range(SlopeChanges[x],1,-1): #step through values in ObstacleArray
+            CurrentCoord = ObstacleArray[y]
+            CurrentX = CurrentCoord[1]
+            NextCoord = ObstacleArray[y-1]
+            NextX = NextCoord[1]
+            Difference = CurrentX - NextX
+            if abs(Difference) > 40:          #until a difference of more than 40 is found
+                ObstacleEdges.append(ObstacleArray[y]) #this identifies the edge of the object
+                EdgeFound = True
+                break
+            EdgeFound = False
+        if EdgeFound is True:
+            for y in range(SlopeChanges[x],(len(ObstacleArray))-1,1):
+               CurrentCoord = ObstacleArray[y]
+               CurrentX = CurrentCoord[1]
+               NextCoord = ObstacleArray[y+1]
+               NextX = NextCoord[1]
+               Difference = CurrentX - NextX
+               if abs(Difference) > 40:
+                    ObstacleEdges.append(ObstacleArray[y])
+                    break
     
+    print "Obstacle Edges", ObstacleEdges
+    print "Number of Slope Changes" , len(SlopeChanges)
+    print "Number of Obstacle Edges" ,len(ObstacleEdges)
 
+    for x in range (0,(len(ObstacleEdges)),1):              
+        cv2.circle(img, ObstacleEdges[x], 2, (255,0,0),-1) #draw a circle at centre point of slope changes
 
-    
+    for x in range (0,(len(ObstacleEdges))-1,2): 
+        cv2.line(img, ObstacleEdges[x], ObstacleEdges[x+1],(0,0,255),10) 
+
     if DisplayImage is True:
         cv2.imshow("camera", img)
         cv2.waitKey(120)
-        cv2.imshow("camera2", imgEdge)
-        cv2.waitKey(120)
+        #cv2.imshow("camera2", imgEdge)
+        #cv2.waitKey(120)
 
 
 ##################################################################################################

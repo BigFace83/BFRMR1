@@ -543,12 +543,13 @@ while True:
 
     while RunForwardScan is True:
         
-        HeadPanAngle = 0 
-        #for x in range(-20,1,10):
-        HeadTiltAngle = -10
-        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)
-        time.sleep(0.2) #small delay to let image settle
-        BFRMR1OpenCV.DetectEdges()
+        
+        HeadTiltAngle = 0 
+        for x in range(-40,41,40):
+            HeadPanAngle = x
+            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
+            time.sleep(0.2) #small delay to let image settle
+            BFRMR1OpenCV.DetectObjects()
             
 
         if RunForwardScan is False:
