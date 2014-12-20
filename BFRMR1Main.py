@@ -544,11 +544,11 @@ while True:
     while RunForwardScan is True:
         
         
-        HeadTiltAngle = 0 
-        for x in range(-40,41,40):
-            HeadPanAngle = x
+        HeadPanAngle = 0
+        for x in range(-30,-9,5):
+            HeadTiltAngle = -20
             RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
-            time.sleep(0.2) #small delay to let image settle
+            time.sleep(0.1) #small delay to let image settle
             BFRMR1OpenCV.DetectObjects()
             
 
