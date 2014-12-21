@@ -5,6 +5,7 @@ import cv
 import cv2
 import numpy
 import sys
+import math
 
 #filecounter = 0 #for saving files when required
 DisplayImage = True
@@ -51,7 +52,7 @@ def DisplayFrame():
 # Detect Edges - Capture a frame and edge detect before displaying
 #
 ##################################################################################################
-def DetectObjects():
+def DetectObjects(HeadTiltAngle):
 
     StepSize = 10
     SlopeChanges = []
@@ -154,7 +155,24 @@ def DetectObjects():
         cv2.circle(img, ObstacleEdges[x], 2, (255,0,0),-1) #draw a circle at centre point of edges
 
     for x in range (0,(len(ObstacleEdges))-1,2): 
-        cv2.line(img, ObstacleEdges[x], ObstacleEdges[x+1],(0,0,255),10) 
+        cv2.line(img, ObstacleEdges[x], ObstacleEdges[x+1],(0,0,255),10)
+
+        #for each obstacle, find the distance to the object
+
+        CurrentCoord = ObstacleEdges[x]
+        CurrentY = CurrentCoord[1]
+        print "Obstacle Y coord" ,CurrentY-240
+        AngleDeg = 90 - ((CurrentY-240)/9.8) + HeadTiltAngle
+        print "Angle Degrees", AngleDeg
+        AngleRad = math.radians(AngleDeg)
+        print "Angle Radians", AngleRad
+        DistToObject = math.tan(AngleRad) * 23
+        print "Distance to Object = ", DistToObject, "cm"
+        
+        cv2.putText(img,str(DistToObject)[:4]+"cm", ObstacleEdges[x], cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255),2)
+        
+
+
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
