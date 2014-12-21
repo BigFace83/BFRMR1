@@ -101,8 +101,8 @@ AutoSpeed = 5  #speed of robot during automatic operation
 ########################################################################################
 def HeadMove(pan,tilt,speed):
 
-    panservovalue = int(128-(pan*1.4)) #convert from angle to value between 0 and 255
-    tiltservovalue = int(128+(tilt*1.4))
+    panservovalue = int(128-(pan*1.5)) #convert from angle to value between 0 and 255
+    tiltservovalue = int(128+(tilt*1.5))
     if speed <= 10:
         BFRMR1serialport.sendserial([255, 255, HEADMOVE, panservovalue, tiltservovalue, speed, 0]) #send command to move head
         while True:
@@ -545,11 +545,11 @@ while True:
         
         
         HeadPanAngle = 0
-        for x in range(-30,-9,5):
+        for x in range(-30,1,5):
             HeadTiltAngle = x
             RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 5)
             time.sleep(0.1) #small delay to let image settle
-            BFRMR1OpenCV.DetectObjects(HeadTiltAngle)
+            BFRMR1OpenCV.DetectObjects(HeadTiltAngle,RobotData[5])
             
 
         if RunForwardScan is False:

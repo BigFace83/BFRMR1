@@ -52,7 +52,7 @@ def DisplayFrame():
 # Detect Edges - Capture a frame and edge detect before displaying
 #
 ##################################################################################################
-def DetectObjects(HeadTiltAngle):
+def DetectObjects(HeadTiltAngle,SonarValue):
 
     StepSize = 10
     SlopeChanges = []
@@ -100,13 +100,13 @@ def DetectObjects(HeadTiltAngle):
         if Difference > 0:             #positive slope
             if SlopePositive is False:
                 if x is not 0:         #ignore first point as this will always be logged
-                    if CurrentY > 240: #change of slope in lower half of image
+                    if CurrentY > 150: #change of slope in lower half of image
                         SlopeChanges.append(x)
             SlopePositive = True
         elif Difference < 0:           #negative slope
             if SlopePositive is True:
                 if x is not 0:         #ignore first point as this will always be logged
-                    if CurrentY > 240: #change of slope in lower half of image
+                    if CurrentY > 150: #change of slope in lower half of image
                         SlopeChanges.append(x)
             SlopePositive = False
             
@@ -162,16 +162,16 @@ def DetectObjects(HeadTiltAngle):
         CurrentCoord = ObstacleEdges[x]
         CurrentY = CurrentCoord[1]
         print "Obstacle Y coord" ,CurrentY-240
-        AngleDeg = 90 - ((CurrentY-240)/9.8) + HeadTiltAngle
+        AngleDeg = 90 - ((CurrentY-240)/11.5) + HeadTiltAngle
         print "Angle Degrees", AngleDeg
         AngleRad = math.radians(AngleDeg)
         print "Angle Radians", AngleRad
         DistToObject = math.tan(AngleRad) * 23
         print "Distance to Object = ", DistToObject, "cm"
         
-        cv2.putText(img,str(DistToObject)[:4]+"cm", ObstacleEdges[x], cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255),2)
+        cv2.putText(img,str(DistToObject)[:4]+"cm", ObstacleEdges[x], cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255),1,cv2.CV_AA)
         
-
+    cv2.putText(img,"Sonar = "+str(SonarValue)[:4]+"cm", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255),1,cv2.CV_AA)
 
 
     if DisplayImage is True:
