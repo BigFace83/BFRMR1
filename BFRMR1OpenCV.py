@@ -18,15 +18,15 @@ capture.set(4,480) #600 480
 
 if DisplayImage is True:
     cv2.namedWindow("camera", 0)
-    cv2.namedWindow("camera2", 0)
+    cv2.namedWindow("map", 0)
     print "Creating OpenCV windows"
     cv2.waitKey(200)
     cv2.resizeWindow("camera", 640,480) 
-    cv2.resizeWindow("camera2", 640,480) 
+    cv2.resizeWindow("map", 400,400) 
     print "Resizing OpenCV windows"
     cv2.waitKey(200)
     cv2.moveWindow("camera", 400,30)
-    cv2.moveWindow("camera2", 1100,30)
+    cv2.moveWindow("map", 1100,30)
     print "Moving OpenCV window"
     cv2.waitKey(200)
 
@@ -49,15 +49,20 @@ def DisplayFrame():
 
 ##################################################################################################
 #
-# Detect Edges - Capture a frame and edge detect before displaying
+# Detect Edges - Capture a frame and find obstacles in the image.
+# Calculate distances to obstacles and display on the screen overlayed on the image
+# Takes HeadPan and HeadTilt angles to calculate positions of obstacles in robot centric
+# coordinates that are then returned in array form
 #
 ##################################################################################################
-def DetectObjects(HeadTiltAngle,SonarValue):
+def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
 
     StepSize = 10
     SlopeChanges = []
     ObstacleEdges = []
     ObstacleArray = []
+    DistanceToObstacle = []
+    EdgesAndDistances = []
     SlopePositive = False
     EdgeFound = False
 
@@ -168,18 +173,35 @@ def DetectObjects(HeadTiltAngle,SonarValue):
         print "Angle Radians", AngleRad
         DistToObject = math.tan(AngleRad) * 23
         print "Distance to Object = ", DistToObject, "cm"
-        
+        DistanceToObstacle.append(DistToObject)
         cv2.putText(img,str(DistToObject)[:4]+"cm", ObstacleEdges[x], cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255),1,cv2.CV_AA)
         
+    #put sonar reading on to the screen
     cv2.putText(img,"Sonar = "+str(SonarValue)[:4]+"cm", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255),1,cv2.CV_AA)
 
+    #form an array of edge coordinates and distances to object of the form (XCoordinate1, XCoordinate2, Distance in cm, XCoordinate1...)
+    for x in range (0,(len(ObstacleEdges)),2): 
+        CurrentCoord = ObstacleEdges[x]
+        CurrentX = CurrentCoord[0]
+        NextCoord = ObstacleEdges[x+1]
+        NextX = NextCoord[0]
+
+        CurrentXRobot = ((CurrentX-320)/10) + HeadPanAngle
+        NextXRobot = ((NextX-320)/10) + HeadPanAngle
+       
+
+        EdgesAndDistances.append(CurrentXRobot)
+        EdgesAndDistances.append(NextXRobot)
+        EdgesAndDistances.append(DistanceToObstacle[x/2])
+    
+
+    print EdgesAndDistances
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
         cv2.waitKey(150)
-        #cv2.imshow("camera2", imgEdge)
-        #cv2.waitKey(120)
-
+        
+    return EdgesAndDistances
 
 ##################################################################################################
 #
@@ -244,6 +266,20 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre):
 
     return objects
  
+##################################################################################################
+#
+# ShowMap - Displays a map in an opencv window
+# 
+#
+##################################################################################################
+def ShowMap(MapArray):
+    
+    MapDisplay = cv2.cvtColor(MapArray, cv2.COLOR_GRAY2BGR)
+    cv2.imshow("map", MapDisplay)
+    cv2.waitKey(150)
+
+
+
 
 def destroy():
     
