@@ -20,6 +20,8 @@ import BFRMR1serialport
 import os
 import BFRMR1OpenCV
 import numpy
+import math
+import cv2
 
 GPIO.setup(4, GPIO.IN) #Buttons
 GPIO.setup(17, GPIO.IN)
@@ -391,7 +393,7 @@ GPIO.add_event_detect(17, GPIO.FALLING, callback=Button1Pressed, bouncetime=200)
 GPIO.add_event_detect(21, GPIO.FALLING, callback=Button2Pressed, bouncetime=200)
 GPIO.add_event_detect(22, GPIO.FALLING, callback=Button3Pressed, bouncetime=200)
 
-MapArray = numpy.zeros((100, 100), numpy.float32) #numpy array for map
+MapArray = numpy.zeros((100, 200), numpy.float32) #numpy array for map
 
 while True:
       
@@ -549,18 +551,27 @@ while True:
 
     while RunForwardScan is True:
         
-        HeadPanAngle = 0
-        for x in range(-30,1,5):
-            HeadTiltAngle = x
+        HeadTiltAngle = -30
+        for x in range(-30,31,15):
+            HeadPanAngle = x
             RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 5)
             time.sleep(0.1) #small delay to let image settle
             ObstaclePositions = BFRMR1OpenCV.DetectObjects(HeadPanAngle,HeadTiltAngle,RobotData[5])
-            for x in range(0,(len(ObstaclePositions)),3):
-                for y in range(ObstaclePositions[x],ObstaclePositions[x+1],1):
-                    MapArray.itemset((100-ObstaclePositions[x+2],50+y), 1)
+
+            for x in range(0,(len(ObstaclePositions)),2):
+                CurrentEdge = ObstaclePositions[x]
+                CurrentX = 100 - CurrentEdge[0]
+                CurrentY = 100 + CurrentEdge[1]
+                NextEdge = ObstaclePositions[x+1]
+                NextX = 100 - NextEdge[0]
+                NextY = 100 + NextEdge[1]
+
+                cv2.line(MapArray, (CurrentY,CurrentX), (NextY,NextX),1,1)
             BFRMR1OpenCV.ShowMap(MapArray)
-            for x in range(MapArray.size):
-                MapArray.itemset(x,0)
+
+        #Erase map, put all values back to zero
+        for x in range(MapArray.size):
+            MapArray.itemset(x,0)    
 
         if RunForwardScan is False:
             ScreenCounter = MAINSCREEN
