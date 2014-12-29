@@ -171,7 +171,7 @@ def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
         print "Angle Degrees", AngleDeg
         AngleRad = math.radians(AngleDeg)
         print "Angle Radians", AngleRad
-        DistToObject = math.tan(AngleRad) * 23
+        DistToObject = math.tan(AngleRad) * 22.5
         print "Distance to Object = ", DistToObject, "cm"
         DistanceToObstacle.append(DistToObject)
         cv2.putText(img,str(DistToObject)[:4]+"cm", ObstacleEdges[x], cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255),1,cv2.CV_AA)
@@ -183,18 +183,18 @@ def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
     for x in range (0,(len(ObstacleEdges)),2): 
         CurrentCoord = ObstacleEdges[x]
         CurrentX = CurrentCoord[0]
-        CurrentXRobot = ((CurrentX-320)/10) + HeadPanAngle
+        CurrentXRobot = ((CurrentX-320)/11.5) + HeadPanAngle
         AngleRads = math.radians(CurrentXRobot) 
-        YCoord = int(math.sin(AngleRads)*DistanceToObstacle[x/2])
-        XCoord= int(math.cos(AngleRads)*DistanceToObstacle[x/2])
+        XCoord = int(math.sin(AngleRads)*DistanceToObstacle[x/2])
+        YCoord= int(math.cos(AngleRads)*DistanceToObstacle[x/2])
         EdgeCoordinates.append((XCoord,YCoord))
 
         NextCoord = ObstacleEdges[x+1]
         NextX = NextCoord[0]
-        NextXRobot = ((NextX-320)/10) + HeadPanAngle
+        NextXRobot = ((NextX-320)/11.5) + HeadPanAngle
         AngleRads = math.radians(NextXRobot) 
-        YCoord = int(math.sin(AngleRads)*DistanceToObstacle[x/2])
-        XCoord= int(math.cos(AngleRads)*DistanceToObstacle[x/2])
+        XCoord = int(math.sin(AngleRads)*DistanceToObstacle[x/2])
+        YCoord= int(math.cos(AngleRads)*DistanceToObstacle[x/2])
         EdgeCoordinates.append((XCoord,YCoord))
  
     

@@ -21,7 +21,7 @@ import os
 import BFRMR1OpenCV
 import numpy
 import math
-import cv2
+
 
 GPIO.setup(4, GPIO.IN) #Buttons
 GPIO.setup(17, GPIO.IN)
@@ -187,6 +187,33 @@ def MoveReverse():
     RobotData = RobotMove(ROBOTREVERSE,50,AutoSpeed, 0, 255) #no sonar or IR threshold so move always completes
     print RobotData
 
+########################################################################################
+#
+# DrawLineBresenham
+#
+# Thanks to http://www.roguebasin.com/index.php?title=Bresenham%27s_Line_Algorithm
+#
+########################################################################################
+def DrawLineBresenham(x1, y1, x2, y2):
+    if x1 > x2:
+        x1, x2 = x2, x1
+        y1, y2 = y2, y1
+    deltax = x2 - x1
+    deltay = abs(y2-y1)
+    error = int(deltax / 2)
+    y = y1
+    ystep = None
+    if y1 < y2:
+        ystep = 1
+    else:
+        ystep = -1
+    for x in range(x1, x2 + 1):
+        MapArray.itemset(y,x,1)
+        error -= deltay
+        if error < 0:
+            y += ystep
+            error += deltax
+   
 
 ########################################################################################
 #
@@ -551,22 +578,24 @@ while True:
 
     while RunForwardScan is True:
         
-        HeadTiltAngle = -30
-        for x in range(-30,31,15):
+        HeadTiltAngle = -20
+        for x in range(-40,41,10):
             HeadPanAngle = x
-            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 5)
+            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 1)
             time.sleep(0.1) #small delay to let image settle
             ObstaclePositions = BFRMR1OpenCV.DetectObjects(HeadPanAngle,HeadTiltAngle,RobotData[5])
 
             for x in range(0,(len(ObstaclePositions)),2):
                 CurrentEdge = ObstaclePositions[x]
-                CurrentX = 100 - CurrentEdge[0]
-                CurrentY = 100 + CurrentEdge[1]
+                CurrentX = 100 + CurrentEdge[0]
+                CurrentY = 100 - CurrentEdge[1]
                 NextEdge = ObstaclePositions[x+1]
-                NextX = 100 - NextEdge[0]
-                NextY = 100 + NextEdge[1]
-
-                cv2.line(MapArray, (CurrentY,CurrentX), (NextY,NextX),1,1)
+                NextX = 100 + NextEdge[0]
+                NextY = 100 - NextEdge[1]
+                DrawLineBresenham(CurrentX,CurrentY,NextX,NextY)
+ 
+                
+                
             BFRMR1OpenCV.ShowMap(MapArray)
 
         #Erase map, put all values back to zero
@@ -577,6 +606,8 @@ while True:
             ScreenCounter = MAINSCREEN
             BFRMR1tft.MainScreen()
             BFRMR1tft.EditMainScreen(PointerCounterMain)
+
+
 
 
 
