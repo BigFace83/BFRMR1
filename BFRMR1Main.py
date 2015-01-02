@@ -47,7 +47,8 @@ VIEWDATASCREEN = 3
 TESTMOVESCREEN = 4
 STOPPINGSCREEN = 255
 
-
+MapWidth = 200
+MapHeight = 200
 
 
 # Data Packet from robot
@@ -195,9 +196,16 @@ def MoveReverse():
 #
 ########################################################################################
 def DrawLineBresenham(x1, y1, x2, y2):
+    
+    issteep = abs(y2-y1) > abs(x2-x1)
+    if issteep:
+        x1, y1 = y1, x1
+        x2, y2 = y2, x2
+    
     if x1 > x2:
         x1, x2 = x2, x1
         y1, y2 = y2, y1
+        
     deltax = x2 - x1
     deltay = abs(y2-y1)
     error = int(deltax / 2)
@@ -208,12 +216,20 @@ def DrawLineBresenham(x1, y1, x2, y2):
     else:
         ystep = -1
     for x in range(x1, x2 + 1):
-        MapArray.itemset(y,x,1)
+        if(y > 0 and y < MapHeight and x > 0 and x < MapWidth):
+            if issteep:
+                NewValue = MapArray.item(x,y) + 0.1
+                MapArray.itemset(x,y,NewValue)
+            else:
+                NewValue = MapArray.item(y,x) + 0.1
+                MapArray.itemset(y,x,NewValue)
         error -= deltay
         if error < 0:
             y += ystep
             error += deltax
-   
+    
+
+
 
 ########################################################################################
 #
@@ -420,7 +436,7 @@ GPIO.add_event_detect(17, GPIO.FALLING, callback=Button1Pressed, bouncetime=200)
 GPIO.add_event_detect(21, GPIO.FALLING, callback=Button2Pressed, bouncetime=200)
 GPIO.add_event_detect(22, GPIO.FALLING, callback=Button3Pressed, bouncetime=200)
 
-MapArray = numpy.zeros((100, 200), numpy.float32) #numpy array for map
+MapArray = numpy.zeros((MapWidth, MapHeight), numpy.float32) #numpy array for map
 
 while True:
       
@@ -578,29 +594,35 @@ while True:
 
     while RunForwardScan is True:
         
-        HeadTiltAngle = -20
-        for x in range(-40,41,10):
-            HeadPanAngle = x
-            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 1)
-            time.sleep(0.1) #small delay to let image settle
-            ObstaclePositions = BFRMR1OpenCV.DetectObjects(HeadPanAngle,HeadTiltAngle,RobotData[5])
-
-            for x in range(0,(len(ObstaclePositions)),2):
-                CurrentEdge = ObstaclePositions[x]
-                CurrentX = 100 + CurrentEdge[0]
-                CurrentY = 100 - CurrentEdge[1]
-                NextEdge = ObstaclePositions[x+1]
-                NextX = 100 + NextEdge[0]
-                NextY = 100 - NextEdge[1]
-                DrawLineBresenham(CurrentX,CurrentY,NextX,NextY)
- 
+        for y in range(-30,-9,10):
+            HeadTiltAngle = y
+            for x in range(-20,21,5):
+                HeadPanAngle = x
+                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
+                time.sleep(0.1) #small delay to let image settle
+                a = BFRMR1OpenCV.FindFirstEdge()
+                WorldArray = BFRMR1OpenCV.FindWorldCoords(a,HeadPanAngle,HeadTiltAngle)
+          
+                for x in range(0,(len(WorldArray))-1,1):
+                    CurrentPoint = WorldArray[x]
+                    CurrentX = MapWidth/2 + CurrentPoint[0]
+                    CurrentY = MapHeight - CurrentPoint[1]
+                    NextPoint = WorldArray[x+1]
+                    NextX = MapWidth/2 + NextPoint[0]
+                    NextY = MapHeight - NextPoint[1]
+                    DrawLineBresenham(CurrentX,CurrentY,NextX,NextY)
                 
-                
-            BFRMR1OpenCV.ShowMap(MapArray)
+                BFRMR1OpenCV.ShowMap(MapArray)
 
-        #Erase map, put all values back to zero
         for x in range(MapArray.size):
-            MapArray.itemset(x,0)    
+           if MapArray.item(x) > 0.5:
+               MapArray.itemset(x,1)  
+           else:
+               MapArray.itemset(x,0)
+        BFRMR1OpenCV.ShowMap(MapArray)
+        #Erase map, put all values back to zero
+        #for x in range(MapArray.size):
+           #MapArray.itemset(x,0)    
 
         if RunForwardScan is False:
             ScreenCounter = MAINSCREEN

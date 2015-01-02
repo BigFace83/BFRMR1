@@ -8,7 +8,7 @@ import sys
 import math
 
 #filecounter = 0 #for saving files when required
-DisplayImage = True
+DisplayImage = False
 
 print "Starting OpenCV"
 capture = cv2.VideoCapture(0)
@@ -49,6 +49,95 @@ def DisplayFrame():
 
 ##################################################################################################
 #
+# FindFirstEdge
+#
+# Captures an image, converts it to grayscale and blurs it before doing canny edge detection.
+# Resulting edge detected image is then analysed to find the first edge in the image, scanning
+# from the bottom to the top at set intervals in the x direction.
+# Returns an array of screen coordinates corresponding to the first edge found.
+##################################################################################################
+def FindFirstEdge():
+
+    StepSize = 10
+    EdgeArray = []
+
+    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
+    ret,img = capture.read() 
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read() #5 seems to be enough
+
+    imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
+    imgGray = cv2.bilateralFilter(imgGray,9,100,510) #blur the image slightly to remove noise             
+    imgEdge = cv2.Canny(imgGray, 10, 60)           #edge detection
+
+    imagewidth = imgEdge.shape[1] - 1
+    imageheight = imgEdge.shape[0] - 1
+    
+
+    for j in range (0,imagewidth,StepSize):    #for the width of image array
+        for i in range(imageheight,0,-1):      #step through every pixel in height of array from bottom to top
+            if imgEdge.item(i,j) == 255:       #check to see if the pixel is white which indicates an edge has been found
+                EdgeArray.append((j,i))    #if it is, add x,y coordinates to ObstacleArray
+                break                          #if white pixel is found, skip rest of pixels in column
+        else:                                  #no white pixel found
+            EdgeArray.append((j,0))        #if nothing found, assume no obstacle. I may regret this decision!
+            
+    
+    for x in range (len(EdgeArray)-1):      #draw lines between points in ObstacleArray 
+        cv2.line(img, EdgeArray[x], EdgeArray[x+1],(0,255,0),1) 
+    for x in range (len(EdgeArray)):        #draw lines from bottom of the screen to points in ObstacleArray
+        cv2.line(img, (x*StepSize,imageheight), EdgeArray[x],(0,255,0),1)
+
+    if DisplayImage is True:
+        cv2.imshow("camera", img)
+        cv2.waitKey(120)
+
+    return EdgeArray
+
+
+##################################################################################################
+#
+# FindWorldCoords
+#
+# Converts all points in EdgeArray from screen coordinates to world coordinates and returns the
+# results as an array of x and y coordinates. Needs head pan and tilt angles.
+#
+##################################################################################################
+def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle):
+
+    WorldArray = []
+
+    for x in range(len(EdgeArray)): #For each point in edge array
+        Point = EdgeArray[x]
+        XScreen = Point[0]
+        XDist = XScreen - 320
+        XAngleRad = (XDist/632.0)
+        XAngleDeg = math.degrees(XAngleRad)
+        XAngleTotal = HeadPanAngle + XAngleDeg
+        
+
+        YScreen = Point[1]
+        YDist = 240 - YScreen
+        YAngleRad = (YDist/632.0)
+        YAngleDeg = math.degrees(YAngleRad)
+        YAngleTotal = HeadTiltAngle + YAngleDeg
+        if YAngleTotal < 0: #YAngle must be less than zero other wise distance to object on the ground cannot be found
+            YAngleTotalRad = math.radians(90+YAngleTotal)
+            YCam = math.tan(YAngleTotalRad) * 23.0
+
+            XAngleTotalRad = math.radians(XAngleTotal)
+            XWorld = math.tan(XAngleTotalRad) * YCam
+            YWorld = math.cos(XAngleTotalRad) * YCam
+
+            WorldArray.append((int(XWorld),int(YWorld)))
+
+            print YAngleTotal
+
+    return WorldArray
+
+##################################################################################################
+#
 # Detect Objects- Capture a frame and find obstacles in the image.
 # Calculate distances to obstacles and display on the screen overlayed on the image
 # Takes HeadPan and HeadTilt angles to calculate positions of obstacles in robot centric
@@ -73,8 +162,8 @@ def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
     ret,img = capture.read() #5 seems to be enough
 
     imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
-    imgGray = cv2.bilateralFilter(imgGray,9,80,80) #blur the image slightly to remove noise             
-    imgEdge = cv2.Canny(imgGray, 10, 100)          #edge detection
+    imgGray = cv2.bilateralFilter(imgGray,9,50,50) #blur the image slightly to remove noise             
+    imgEdge = cv2.Canny(imgGray, 10, 80)          #edge detection
 
     ObstacleArray = []
     imagewidth = imgEdge.shape[1] - 1
@@ -105,13 +194,13 @@ def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
         if Difference > 0:             #positive slope
             if SlopePositive is False:
                 if x is not 0:         #ignore first point as this will always be logged
-                    if CurrentY > 150: #change of slope in lower half of image
+                    if CurrentY > 200: #change of slope in lower half of image
                         SlopeChanges.append(x)
             SlopePositive = True
         elif Difference < 0:           #negative slope
             if SlopePositive is True:
                 if x is not 0:         #ignore first point as this will always be logged
-                    if CurrentY > 150: #change of slope in lower half of image
+                    if CurrentY > 200: #change of slope in lower half of image
                         SlopeChanges.append(x)
             SlopePositive = False
             
@@ -120,10 +209,10 @@ def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
     for x in range (0,(len(SlopeChanges)),1):              
         cv2.circle(img, ObstacleArray[SlopeChanges[x]], 2, (0,0,255),-1) #draw a circle at centre point of slope changes 
     
-    #to find egdes of each object
+    #to find edges of each object
     for x in range (0,(len(SlopeChanges)),1):        #for each slope change found and stored in SlopeChanges
         FirstEdge = ()
-        SlopeThreshold = 20
+        SlopeThreshold = 50
         CurrentSlopeCoord = ObstacleArray[SlopeChanges[x]]
         SlopeY = CurrentSlopeCoord[1]
         for y in range(SlopeChanges[x],1,-1):        #step through values in ObstacleArray
@@ -166,12 +255,16 @@ def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
 
         CurrentCoord = ObstacleEdges[x]
         CurrentY = CurrentCoord[1]
+        CurrentX = CurrentCoord[0]
         print "Obstacle Y coord" ,CurrentY-240
-        AngleDeg = 90 - ((CurrentY-240)/11.5) + HeadTiltAngle
+        AngleDeg = 90 - ((CurrentY-240)/11.13) + HeadTiltAngle
         print "Angle Degrees", AngleDeg
         AngleRad = math.radians(AngleDeg)
         print "Angle Radians", AngleRad
-        DistToObject = math.tan(AngleRad) * 22.5
+        Dist = math.tan(AngleRad) * 23
+        xanglerad = math.atan((340-CurrentX)/638)
+        print "Xangle",xanglerad
+        DistToObject = Dist/(math.cos(xanglerad))
         print "Distance to Object = ", DistToObject, "cm"
         DistanceToObstacle.append(DistToObject)
         cv2.putText(img,str(DistToObject)[:4]+"cm", ObstacleEdges[x], cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255),1,cv2.CV_AA)
@@ -183,7 +276,7 @@ def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
     for x in range (0,(len(ObstacleEdges)),2): 
         CurrentCoord = ObstacleEdges[x]
         CurrentX = CurrentCoord[0]
-        CurrentXRobot = ((CurrentX-320)/11.5) + HeadPanAngle
+        CurrentXRobot = ((CurrentX-320)/11.13) + HeadPanAngle
         AngleRads = math.radians(CurrentXRobot) 
         XCoord = int(math.sin(AngleRads)*DistanceToObstacle[x/2])
         YCoord= int(math.cos(AngleRads)*DistanceToObstacle[x/2])
@@ -191,7 +284,7 @@ def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
 
         NextCoord = ObstacleEdges[x+1]
         NextX = NextCoord[0]
-        NextXRobot = ((NextX-320)/11.5) + HeadPanAngle
+        NextXRobot = ((NextX-320)/11.13) + HeadPanAngle
         AngleRads = math.radians(NextXRobot) 
         XCoord = int(math.sin(AngleRads)*DistanceToObstacle[x/2])
         YCoord= int(math.cos(AngleRads)*DistanceToObstacle[x/2])
@@ -279,7 +372,7 @@ def ShowMap(MapArray):
     
     MapDisplay = cv2.cvtColor(MapArray, cv2.COLOR_GRAY2BGR)
     cv2.imshow("map", MapDisplay)
-    cv2.waitKey(150)
+    cv2.waitKey(120)
 
 
 
