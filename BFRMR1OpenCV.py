@@ -8,7 +8,7 @@ import sys
 import math
 
 #filecounter = 0 #for saving files when required
-DisplayImage = False
+DisplayImage = True
 
 print "Starting OpenCV"
 capture = cv2.VideoCapture(0)
@@ -58,8 +58,12 @@ def DisplayFrame():
 ##################################################################################################
 def FindFirstEdge():
 
-    StepSize = 10
+    StepSize = 20
     EdgeArray = []
+
+    #camera calibration values
+    K = numpy.array([[612.00, 0, 330.00], [0, 613.00, 254.00], [0, 0, 1]])
+    d = numpy.array([0.05897, -0.4494, 0, 0, 0]) # just use first two terms (no translation)
 
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
     ret,img = capture.read() 
@@ -67,21 +71,28 @@ def FindFirstEdge():
     ret,img = capture.read()
     ret,img = capture.read() #5 seems to be enough
 
-    imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
-    imgGray = cv2.bilateralFilter(imgGray,9,100,510) #blur the image slightly to remove noise             
-    imgEdge = cv2.Canny(imgGray, 10, 60)           #edge detection
+    #undistort image
+    h, w = img.shape[:2]
+    newcamera, roi = cv2.getOptimalNewCameraMatrix(K, d, (w,h), 0) 
+    img = cv2.undistort(img, K, d, None, newcamera)
+
+    imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)   #convert img to grayscale and store result in imgGray
+    imgGray = cv2.bilateralFilter(imgGray,9,150,150) #blur the image slightly to remove noise             
+    imgEdge = cv2.Canny(imgGray, 15, 100)             #edge detection
 
     imagewidth = imgEdge.shape[1] - 1
     imageheight = imgEdge.shape[0] - 1
     
 
     for j in range (0,imagewidth,StepSize):    #for the width of image array
-        for i in range(imageheight,0,-1):      #step through every pixel in height of array from bottom to top
+        for i in range(imageheight-5,0,-1):    #step through every pixel in height of array from bottom to top
+                                               #Ignore first couple of pixels as may trigger due to undistort
             if imgEdge.item(i,j) == 255:       #check to see if the pixel is white which indicates an edge has been found
-                EdgeArray.append((j,i))    #if it is, add x,y coordinates to ObstacleArray
+                EdgeArray.append((j,i))        #if it is, add x,y coordinates to ObstacleArray
                 break                          #if white pixel is found, skip rest of pixels in column
         else:                                  #no white pixel found
-            EdgeArray.append((j,0))        #if nothing found, assume no obstacle. I may regret this decision!
+            EdgeArray.append((j,-500))         #if nothing found, assume no obstacle. Set pixel position way off the screen to indicate
+                                               #no obstacle detected
             
     
     for x in range (len(EdgeArray)-1):      #draw lines between points in ObstacleArray 
@@ -111,193 +122,38 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle):
     for x in range(len(EdgeArray)): #For each point in edge array
         Point = EdgeArray[x]
         XScreen = Point[0]
-        XDist = XScreen - 320
-        XAngleRad = (XDist/632.0)
-        XAngleDeg = math.degrees(XAngleRad)
-        XAngleTotal = HeadPanAngle + XAngleDeg
+        XDist = XScreen - 330.00
+        XCamAngle = math.atan(XDist/612.00)
+        XCamAngleDeg = math.degrees(XCamAngle )
+        #XAngleTotal = HeadPanAngle + XAngleDeg
         
 
         YScreen = Point[1]
-        YDist = 240 - YScreen
-        YAngleRad = (YDist/632.0)
-        YAngleDeg = math.degrees(YAngleRad)
-        YAngleTotal = HeadTiltAngle + YAngleDeg
-        if YAngleTotal < 0: #YAngle must be less than zero other wise distance to object on the ground cannot be found
+        YDist = 254.00 - YScreen
+        YCamAngle = math.atan(YDist/613.00)
+        YCamAngleDeg = math.degrees(YCamAngle)
+
+        YAngleTotal = HeadTiltAngle + YCamAngleDeg
+
+
+        if YAngleTotal < 0 and YScreen > 0: #YAngle must be less than zero other wise distance to object on the ground cannot be found
             YAngleTotalRad = math.radians(90+YAngleTotal)
-            YCam = math.tan(YAngleTotalRad) * 23.0
+            YCam = math.tan(YAngleTotalRad) * 23.5
+            YCam = YCam/math.cos(math.radians(XCamAngle))
+            XCam = math.tan(XCamAngle) * YCam
+            #Rotate points around z axis by HeadPanAngle degrees
+            HeadPanRad = math.radians(HeadPanAngle)
+            XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
+            YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
 
-            XAngleTotalRad = math.radians(XAngleTotal)
-            XWorld = math.tan(XAngleTotalRad) * YCam
-            YWorld = math.cos(XAngleTotalRad) * YCam
-
+           
             WorldArray.append((int(XWorld),int(YWorld)))
 
-            print YAngleTotal
+            print XWorld, YWorld
 
     return WorldArray
 
-##################################################################################################
-#
-# Detect Objects- Capture a frame and find obstacles in the image.
-# Calculate distances to obstacles and display on the screen overlayed on the image
-# Takes HeadPan and HeadTilt angles to calculate positions of obstacles in robot centric
-# coordinates that are then returned in array form
-#
-##################################################################################################
-def DetectObjects(HeadPanAngle,HeadTiltAngle,SonarValue):
 
-    StepSize = 10
-    SlopeChanges = []
-    ObstacleEdges = []
-    ObstacleArray = []
-    DistanceToObstacle = []
-    EdgeCoordinates = []
-    SlopePositive = False
-    EdgeFound = False
-
-    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
-    ret,img = capture.read() 
-    ret,img = capture.read()
-    ret,img = capture.read()
-    ret,img = capture.read() #5 seems to be enough
-
-    imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) #convert img to grayscale and store result in imgGray
-    imgGray = cv2.bilateralFilter(imgGray,9,50,50) #blur the image slightly to remove noise             
-    imgEdge = cv2.Canny(imgGray, 10, 80)          #edge detection
-
-    ObstacleArray = []
-    imagewidth = imgEdge.shape[1] - 1
-    imageheight = imgEdge.shape[0] - 1
-    
-
-    for j in range (0,imagewidth,StepSize):    #for the width of image array
-        for i in range(imageheight,0,-1):      #step through every pixel in height of array from bottom to top
-            if imgEdge.item(i,j) == 255:       #check to see if the pixel is white which indicates an edge has been found
-                ObstacleArray.append((j,i))    #if it is, add x,y coordinates to ObstacleArray
-                break                          #if white pixel is found, skip rest of pixels in column
-        else:                                  #no white pixel found
-            ObstacleArray.append((j,0))        #if nothing found, assume no obstacle. I may regret this decision!
-            
-    
-    for x in range (len(ObstacleArray)-1):      #draw lines between points in ObstacleArray 
-        cv2.line(img, ObstacleArray[x], ObstacleArray[x+1],(0,255,0),1) 
-    for x in range (len(ObstacleArray)):        #draw lines from bottom of the screen to points in ObstacleArray
-        cv2.line(img, (x*StepSize,imageheight), ObstacleArray[x],(0,255,0),1)  
-
-    #look for slope changes in ObstacleArray to try and find obstacles on the floor
-    for x in range (len(ObstacleArray)-1):
-        CurrentCoord = ObstacleArray[x]
-        CurrentY = CurrentCoord[1]
-        NextCoord = ObstacleArray[x+1]
-        NextY = NextCoord[1]
-        Difference = CurrentY - NextY
-        if Difference > 0:             #positive slope
-            if SlopePositive is False:
-                if x is not 0:         #ignore first point as this will always be logged
-                    if CurrentY > 200: #change of slope in lower half of image
-                        SlopeChanges.append(x)
-            SlopePositive = True
-        elif Difference < 0:           #negative slope
-            if SlopePositive is True:
-                if x is not 0:         #ignore first point as this will always be logged
-                    if CurrentY > 200: #change of slope in lower half of image
-                        SlopeChanges.append(x)
-            SlopePositive = False
-            
-    
-
-    for x in range (0,(len(SlopeChanges)),1):              
-        cv2.circle(img, ObstacleArray[SlopeChanges[x]], 2, (0,0,255),-1) #draw a circle at centre point of slope changes 
-    
-    #to find edges of each object
-    for x in range (0,(len(SlopeChanges)),1):        #for each slope change found and stored in SlopeChanges
-        FirstEdge = ()
-        SlopeThreshold = 50
-        CurrentSlopeCoord = ObstacleArray[SlopeChanges[x]]
-        SlopeY = CurrentSlopeCoord[1]
-        for y in range(SlopeChanges[x],1,-1):        #step through values in ObstacleArray
-            CurrentCoord = ObstacleArray[y]          #separate out X and Y coordinates of point stored in SlopeChanges
-            CurrentX = CurrentCoord[0]
-            CurrentY = CurrentCoord[1]
-            NextCoord = ObstacleArray[y-1]           #get Y coordinate of next point in ObstacleArray
-            NextY = NextCoord[1]
-            Difference = CurrentY- NextY
-            if Difference > SlopeThreshold:          #until a difference of more than SlopeThreshold is found
-                FirstEdge = (CurrentX,SlopeY)        #store coordinates of obstacle edge to be used later of other side of obstacle is found
-                EdgeFound = True                     #only scan in other direction if an edge has been found
-                break
-            EdgeFound = False                        #if no edge found, ignore this change in slope, probably not an obstacle
-        if EdgeFound is True:
-            for y in range(SlopeChanges[x],(len(ObstacleArray))-1,1): #scan in other direction to find opposing edge of obstacle
-               CurrentCoord = ObstacleArray[y]
-               CurrentX = CurrentCoord[0]
-               CurrentY = CurrentCoord[1]
-               NextCoord = ObstacleArray[y+1]
-               NextY = NextCoord[1]
-               Difference = CurrentY - NextY         
-               if Difference > SlopeThreshold:
-                    ObstacleEdges.append(FirstEdge)   #only log edges if both sides of the obstacle have been found
-                    ObstacleEdges.append((CurrentX,SlopeY))
-                    break
-
-    #print "Slope Changes", SlopeChanges
-    print "Obstacle Edges", ObstacleEdges
-    print "Number of Slope Changes" , len(SlopeChanges)
-    print "Number of Obstacle Edges" ,len(ObstacleEdges)
-
-    for x in range (0,(len(ObstacleEdges)),1):              
-        cv2.circle(img, ObstacleEdges[x], 2, (255,0,0),-1) #draw a circle at centre point of edges
-
-    for x in range (0,(len(ObstacleEdges))-1,2): 
-        cv2.line(img, ObstacleEdges[x], ObstacleEdges[x+1],(0,0,255),10)
-
-        #for each obstacle, find the distance to the object
-
-        CurrentCoord = ObstacleEdges[x]
-        CurrentY = CurrentCoord[1]
-        CurrentX = CurrentCoord[0]
-        print "Obstacle Y coord" ,CurrentY-240
-        AngleDeg = 90 - ((CurrentY-240)/11.13) + HeadTiltAngle
-        print "Angle Degrees", AngleDeg
-        AngleRad = math.radians(AngleDeg)
-        print "Angle Radians", AngleRad
-        Dist = math.tan(AngleRad) * 23
-        xanglerad = math.atan((340-CurrentX)/638)
-        print "Xangle",xanglerad
-        DistToObject = Dist/(math.cos(xanglerad))
-        print "Distance to Object = ", DistToObject, "cm"
-        DistanceToObstacle.append(DistToObject)
-        cv2.putText(img,str(DistToObject)[:4]+"cm", ObstacleEdges[x], cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255),1,cv2.CV_AA)
-        
-    #put sonar reading on to the screen
-    cv2.putText(img,"Sonar = "+str(SonarValue)[:4]+"cm", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,255),1,cv2.CV_AA)
-
-    #form an array of edge angles and distances to object of the form (Xangle1, Xangle2, Distance in cm, Xangle1...)
-    for x in range (0,(len(ObstacleEdges)),2): 
-        CurrentCoord = ObstacleEdges[x]
-        CurrentX = CurrentCoord[0]
-        CurrentXRobot = ((CurrentX-320)/11.13) + HeadPanAngle
-        AngleRads = math.radians(CurrentXRobot) 
-        XCoord = int(math.sin(AngleRads)*DistanceToObstacle[x/2])
-        YCoord= int(math.cos(AngleRads)*DistanceToObstacle[x/2])
-        EdgeCoordinates.append((XCoord,YCoord))
-
-        NextCoord = ObstacleEdges[x+1]
-        NextX = NextCoord[0]
-        NextXRobot = ((NextX-320)/11.13) + HeadPanAngle
-        AngleRads = math.radians(NextXRobot) 
-        XCoord = int(math.sin(AngleRads)*DistanceToObstacle[x/2])
-        YCoord= int(math.cos(AngleRads)*DistanceToObstacle[x/2])
-        EdgeCoordinates.append((XCoord,YCoord))
- 
-    
-
-    if DisplayImage is True:
-        cv2.imshow("camera", img)
-        cv2.waitKey(150)
-        
-    print EdgeCoordinates
-    return EdgeCoordinates
 
 ##################################################################################################
 #

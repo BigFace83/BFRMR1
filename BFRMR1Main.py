@@ -108,8 +108,8 @@ AutoSpeed = 5  #speed of robot during automatic operation
 ########################################################################################
 def HeadMove(pan,tilt,speed):
 
-    panservovalue = int(128-(pan*1.5)) #convert from angle to value between 0 and 255
-    tiltservovalue = int(128+(tilt*1.5))
+    panservovalue = int(128-(pan*1.45)) #convert from angle to value between 0 and 255
+    tiltservovalue = int(128+(tilt*1.45))
     if speed <= 10:
         BFRMR1serialport.sendserial([255, 255, HEADMOVE, panservovalue, tiltservovalue, speed, 0]) #send command to move head
         while True:
@@ -195,7 +195,7 @@ def MoveReverse():
 # Thanks to http://www.roguebasin.com/index.php?title=Bresenham%27s_Line_Algorithm
 #
 ########################################################################################
-def DrawLineBresenham(x1, y1, x2, y2):
+def DrawLineBresenham(MapArray, x1, y1, x2, y2):
     
     issteep = abs(y2-y1) > abs(x2-x1)
     if issteep:
@@ -227,7 +227,34 @@ def DrawLineBresenham(x1, y1, x2, y2):
         if error < 0:
             y += ystep
             error += deltax
+
+    return MapArray
     
+
+########################################################################################
+#
+# TidyMap
+#
+# Takes a map array as an arguement. Scans from bottom to find the first non-zero pixel.
+# This pixels value is then changed to a 1. Map array is returned. 
+#
+########################################################################################
+def TidyMap(MapArray):
+
+    width = MapArray.shape[1] -1
+    height = MapArray.shape[0] -1
+    
+    for j in range (0,width,1):    #for the width of array
+        for i in range(height,0,-1):
+            if MapArray.item(i,j) > 0:       #check to see if the pixel is non-zero
+                MapArray.itemset(i,j,1)       #if it is, set it to 1
+                break                         #if pixel is found, skip rest of pixels in column
+        else:                             #no non-zero pixel found
+            MapArray.itemset(0,j,1) 
+
+    return MapArray
+
+
 
 
 
@@ -437,6 +464,8 @@ GPIO.add_event_detect(21, GPIO.FALLING, callback=Button2Pressed, bouncetime=200)
 GPIO.add_event_detect(22, GPIO.FALLING, callback=Button3Pressed, bouncetime=200)
 
 MapArray = numpy.zeros((MapWidth, MapHeight), numpy.float32) #numpy array for map
+for x in range(0,MapHeight,5):
+    MapArray.itemset(x,0,1)
 
 while True:
       
@@ -594,9 +623,9 @@ while True:
 
     while RunForwardScan is True:
         
-        for y in range(-30,-9,10):
+        for y in range(-30,-9,30):
             HeadTiltAngle = y
-            for x in range(-20,21,5):
+            for x in range(-20,21,10):
                 HeadPanAngle = x
                 RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
                 time.sleep(0.1) #small delay to let image settle
@@ -610,19 +639,21 @@ while True:
                     NextPoint = WorldArray[x+1]
                     NextX = MapWidth/2 + NextPoint[0]
                     NextY = MapHeight - NextPoint[1]
-                    DrawLineBresenham(CurrentX,CurrentY,NextX,NextY)
+                    MapArray = DrawLineBresenham(MapArray,CurrentX,CurrentY,NextX,NextY)
                 
                 BFRMR1OpenCV.ShowMap(MapArray)
+                
 
-        for x in range(MapArray.size):
-           if MapArray.item(x) > 0.5:
-               MapArray.itemset(x,1)  
-           else:
-               MapArray.itemset(x,0)
+        MapArray = TidyMap(MapArray)
         BFRMR1OpenCV.ShowMap(MapArray)
+
+        time.sleep(5)
         #Erase map, put all values back to zero
-        #for x in range(MapArray.size):
-           #MapArray.itemset(x,0)    
+        for x in range(MapArray.size):
+            MapArray.itemset(x,0)
+        for x in range(0,MapHeight,5):
+            MapArray.itemset(x,0,1)
+            
 
         if RunForwardScan is False:
             ScreenCounter = MAINSCREEN
