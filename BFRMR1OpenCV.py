@@ -7,7 +7,6 @@ import numpy
 import sys
 import math
 
-#filecounter = 0 #for saving files when required
 DisplayImage = True
 
 print "Starting OpenCV"
@@ -58,7 +57,7 @@ def DisplayFrame():
 ##################################################################################################
 def FindFirstEdge():
 
-    StepSize = 10
+    StepSize = 5
     EdgeArray = []
 
     #camera calibration values
@@ -115,7 +114,7 @@ def FindFirstEdge():
 # results as an array of x and y coordinates. Needs head pan and tilt angles.
 #
 ##################################################################################################
-def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle):
+def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle,Scale):
 
     WorldArray = []
 
@@ -145,6 +144,9 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle):
             HeadPanRad = math.radians(HeadPanAngle)
             XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
             YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
+
+            XWorld = XWorld/Scale
+            YWorld = YWorld/Scale
 
             WorldArray.append((int(XWorld),int(YWorld)))
             
@@ -219,7 +221,7 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre):
 ##################################################################################################
 #
 # ShowMap - Displays a map in an opencv window
-# 
+# MapArray is a numpy array where each element has a value between 0 and 1
 #
 ##################################################################################################
 def ShowMap(MapArray):

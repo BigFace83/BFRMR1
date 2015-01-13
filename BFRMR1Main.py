@@ -49,6 +49,7 @@ STOPPINGSCREEN = 255
 
 MapWidth = 200
 MapHeight = 200
+MapScale = 1
 
 
 # Data Packet from robot
@@ -195,7 +196,7 @@ def MoveReverse():
 # Thanks to http://www.roguebasin.com/index.php?title=Bresenham%27s_Line_Algorithm
 #
 ########################################################################################
-def DrawLineBresenham(MapArray, x1, y1, x2, y2):
+def DrawLineBresenham(MapArray, x1, y1, x2, y2, IncValue):
     
     issteep = abs(y2-y1) > abs(x2-x1)
     if issteep:
@@ -215,14 +216,17 @@ def DrawLineBresenham(MapArray, x1, y1, x2, y2):
         ystep = 1
     else:
         ystep = -1
-    for x in range(x1, x2 + 1):
+
+    for x in range(x1, x2 + 1):    
+              
         if(y > 0 and y < MapHeight and x > 0 and x < MapWidth):
             if issteep:
-                NewValue = MapArray.item(x,y) + 0.1
+                NewValue = MapArray.item(x,y) + IncValue
                 MapArray.itemset(x,y,NewValue)
             else:
-                NewValue = MapArray.item(y,x) + 0.1
+                NewValue = MapArray.item(y,x) + IncValue
                 MapArray.itemset(y,x,NewValue)
+
         error -= deltay
         if error < 0:
             y += ystep
@@ -231,8 +235,53 @@ def DrawLineBresenham(MapArray, x1, y1, x2, y2):
     return MapArray
     
 
+########################################################################################
+#
+# AddToMap
+#
+# Takes an array of x,y coordinates as an arguement and uses this to plot free space
+# and obstacles on the map. Also takes as an arguement the map array to plot to.
+#
+########################################################################################
+def AddToMap(MapArray,CoordArray):
+    
+    MapHeightfloat = float(MapHeight)
 
+    #Plot free space between robot and objects detected
+    for x in range(0,(len(CoordArray)),1):
+         CurrentPoint = CoordArray[x]
+         CurrentX = MapWidth/2 + CurrentPoint[0] #Convert to map coordinates
+         CurrentY = MapHeight - CurrentPoint[1]
+         MapArray = DrawLineBresenham(MapArray,MapWidth/2,MapHeight ,CurrentX,CurrentY, 0.05)
 
+    #Plot area beyond free space as occupied
+    for x in range(0,(len(CoordArray)),1):
+         CurrentPoint = CoordArray[x]
+         CurrentX = MapWidth/2 + CurrentPoint[0] #Convert to map coordinates
+         CurrentY = MapHeight - CurrentPoint[1]
+         Scale = abs(MapHeightfloat/CurrentPoint[1])
+         EndX = int(MapWidth/2 + (CurrentPoint[0] * Scale))
+         EndY = int(MapHeight - (CurrentPoint[1] * Scale))
+         MapArray = DrawLineBresenham(MapArray,CurrentX,CurrentY ,EndX,EndY, -0.05)
+
+    return MapArray
+ 
+ 
+########################################################################################
+#
+# TidyMap
+#
+#
+########################################################################################
+def TidyMap(MapArray):
+
+    for x in range(MapArray.size):
+        if MapArray.item(x) > 0.7:
+            MapArray.itemset(x,1)
+        else:
+            MapArray.itemset(x,0)
+
+    return MapArray
 
 
 ########################################################################################
@@ -602,41 +651,23 @@ while True:
 
     while RunForwardScan is True:
         
-        for y in range(-30,-9,10):
+        for y in range(-30,-9,20):
             HeadTiltAngle = y
             for x in range(-20,21,10):
                 HeadPanAngle = x
-                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
+                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)
                 time.sleep(0.1) #small delay to let image settle
                 a = BFRMR1OpenCV.FindFirstEdge()
-                WorldArray = BFRMR1OpenCV.FindWorldCoords(a,HeadPanAngle,HeadTiltAngle)
-                
-                for x in range(0,(len(WorldArray)),1):
-                    CurrentPoint = WorldArray[x]
-                    CurrentX = MapWidth/2 + CurrentPoint[0]
-                    CurrentY = MapHeight - CurrentPoint[1]
-                    MapArray = DrawLineBresenham(MapArray,MapWidth/2,MapHeight ,CurrentX,CurrentY)
-
-                #for x in range(0,(len(WorldArray))-1,1):
-                #    CurrentPoint = WorldArray[x]
-                #    CurrentX = MapWidth/2 + CurrentPoint[0]
-                #    CurrentY = MapHeight - CurrentPoint[1]
-                #    NextPoint = WorldArray[x+1]
-                #    NextX = MapWidth/2 + NextPoint[0]
-                #    NextY = MapHeight - NextPoint[1]
-                #    MapArray = DrawLineBresenham(MapArray,CurrentX,CurrentY,NextX,NextY)
-                    
-                
+                WorldArray = BFRMR1OpenCV.FindWorldCoords(a,HeadPanAngle,HeadTiltAngle,MapScale)
+                MapArray = AddToMap(MapArray,WorldArray)
                 BFRMR1OpenCV.ShowMap(MapArray)
                 
-                
-
-        #time.sleep(5)
-        #Erase map, put all values back to 0.5
-        #for x in range(MapArray.size):
-        #    MapArray.itemset(x,0.5)
-        #for x in range(0,MapHeight,5):
-        #    MapArray.itemset(x,0,1)
+        MapArray = TidyMap(MapArray)        
+        BFRMR1OpenCV.ShowMap(MapArray)
+        for x in range(MapArray.size):
+            MapArray.itemset(x,0.5) #set all cell values to 0.5
+        for x in range(0,MapHeight,5):
+            MapArray.itemset(x,0,1)
             
 
         if RunForwardScan is False:
