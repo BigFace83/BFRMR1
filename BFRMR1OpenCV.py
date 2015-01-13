@@ -22,7 +22,7 @@ if DisplayImage is True:
     print "Creating OpenCV windows"
     cv2.waitKey(200)
     cv2.resizeWindow("camera", 640,480) 
-    cv2.resizeWindow("map", 800,400) 
+    cv2.resizeWindow("map", 600,600) 
     print "Resizing OpenCV windows"
     cv2.waitKey(200)
     cv2.moveWindow("camera", 400,30)
@@ -58,7 +58,7 @@ def DisplayFrame():
 ##################################################################################################
 def FindFirstEdge():
 
-    StepSize = 20
+    StepSize = 10
     EdgeArray = []
 
     #camera calibration values
@@ -91,7 +91,7 @@ def FindFirstEdge():
                 EdgeArray.append((j,i))        #if it is, add x,y coordinates to ObstacleArray
                 break                          #if white pixel is found, skip rest of pixels in column
         else:                                  #no white pixel found
-            EdgeArray.append((j,-500))         #if nothing found, assume no obstacle. Set pixel position way off the screen to indicate
+            EdgeArray.append((j,20))            #if nothing found, assume no obstacle. Set pixel position way off the screen to indicate
                                                #no obstacle detected
             
     
@@ -102,7 +102,7 @@ def FindFirstEdge():
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
-        cv2.waitKey(120)
+        cv2.waitKey(150)
 
     return EdgeArray
 
@@ -136,7 +136,7 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle):
         YAngleTotal = HeadTiltAngle + YCamAngleDeg
 
 
-        if YAngleTotal < 0 and YScreen > 0: #YAngle must be less than zero other wise distance to object on the ground cannot be found
+        if YAngleTotal < 0 and YScreen > 0: #YAngle must be less than zero otherwise distance to object on the ground cannot be found
             YAngleTotalRad = math.radians(90+YAngleTotal)
             YCam = math.tan(YAngleTotalRad) * 23.5
             YCam = YCam/math.cos(math.radians(XCamAngle))
@@ -146,11 +146,9 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle):
             XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
             YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
 
-           
             WorldArray.append((int(XWorld),int(YWorld)))
-
-            print XWorld, YWorld
-
+            
+    
     return WorldArray
 
 
@@ -228,7 +226,7 @@ def ShowMap(MapArray):
     
     MapDisplay = cv2.cvtColor(MapArray, cv2.COLOR_GRAY2BGR)
     cv2.imshow("map", MapDisplay)
-    cv2.waitKey(120)
+    cv2.waitKey(150)
 
 
 
