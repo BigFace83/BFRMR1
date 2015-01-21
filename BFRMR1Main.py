@@ -47,8 +47,8 @@ VIEWDATASCREEN = 3
 TESTMOVESCREEN = 4
 STOPPINGSCREEN = 255
 
-MapWidth = 200
-MapHeight = 200
+MapWidth = 250
+MapHeight = 250
 MapScale = 1
 
 
@@ -252,7 +252,7 @@ def AddToMap(MapArray,CoordArray):
          CurrentPoint = CoordArray[x]
          CurrentX = MapWidth/2 + CurrentPoint[0] #Convert to map coordinates
          CurrentY = MapHeight - CurrentPoint[1]
-         MapArray = DrawLineBresenham(MapArray,MapWidth/2,MapHeight ,CurrentX,CurrentY, 0.05)
+         MapArray = DrawLineBresenham(MapArray,MapWidth/2,MapHeight ,CurrentX,CurrentY, 0.1)
 
     #Plot area beyond free space as occupied
     for x in range(0,(len(CoordArray)),1):
@@ -262,26 +262,11 @@ def AddToMap(MapArray,CoordArray):
          Scale = abs(MapHeightfloat/CurrentPoint[1])
          EndX = int(MapWidth/2 + (CurrentPoint[0] * Scale))
          EndY = int(MapHeight - (CurrentPoint[1] * Scale))
-         MapArray = DrawLineBresenham(MapArray,CurrentX,CurrentY ,EndX,EndY, -0.05)
+         MapArray = DrawLineBresenham(MapArray,CurrentX,CurrentY ,EndX,EndY, -0.1)
 
     return MapArray
  
- 
-########################################################################################
-#
-# TidyMap
-#
-#
-########################################################################################
-def TidyMap(MapArray):
 
-    for x in range(MapArray.size):
-        if MapArray.item(x) > 0.7:
-            MapArray.itemset(x,1)
-        else:
-            MapArray.itemset(x,0)
-
-    return MapArray
 
 
 ########################################################################################
@@ -298,16 +283,16 @@ def FindFoodTargets():
 
     for x in range(-40,41,40):
         HeadPanAngle = x
-        RobotData = HeadMove(HeadPanAngle,0, 10)
+        RobotData = HeadMove(HeadPanAngle,0, 3)
         time.sleep(0.5) #small delay, let image settle
         TargetCoords = BFRMR1OpenCV.FindObjects(YELLOWOBJECTS, 1000, RobotData[5])
         if len(TargetCoords) > 0: #Targets found in current image frame
             for x in range(0,len(TargetCoords),4): #cycle through coordinate values returned from image analysis
                 #convert from camera centred coordinates to robot centred coodinates
                 #taking account of head servo position
-                xrobotcoord = ((TargetCoords[x]-320)/10) + HeadPanAngle
+                xrobotcoord = ((TargetCoords[x]-330.00)/10) + HeadPanAngle
                 FoodTargets.append(xrobotcoord)
-                yrobotcoord = (240-TargetCoords[x+1])/12
+                yrobotcoord = (254.00-TargetCoords[x+1])/12
                 FoodTargets.append(yrobotcoord)
                 FoodTargets.append(TargetCoords[x+2]) #object size
                 FoodTargets.append(TargetCoords[x+3]) #object distance
@@ -651,18 +636,29 @@ while True:
 
     while RunForwardScan is True:
         
-        for y in range(-30,-9,20):
+
+        FoodTargets = FindFoodTargets() #look around for yellow objects
+        if len(FoodTargets) is 0:
+            print "No target found" #no target found
+            PlayTone(1)      
+        else:
+            print "Target found at", FoodTargets
+            LargestObject = RankTargetsSize(FoodTargets) #find the largest target in the list
+            print "Largest target found at", LargestObject
+
+        for y in range(-20,1,30):
             HeadTiltAngle = y
-            for x in range(-20,21,10):
+            for x in range(-50,51,20):
                 HeadPanAngle = x
-                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)
+                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 3)
                 time.sleep(0.1) #small delay to let image settle
                 a = BFRMR1OpenCV.FindFirstEdge()
                 WorldArray = BFRMR1OpenCV.FindWorldCoords(a,HeadPanAngle,HeadTiltAngle,MapScale)
                 MapArray = AddToMap(MapArray,WorldArray)
+                print "Add to Map"
                 BFRMR1OpenCV.ShowMap(MapArray)
                 
-        MapArray = TidyMap(MapArray)        
+        MapArray = BFRMR1OpenCV.TidyMap(MapArray)      
         BFRMR1OpenCV.ShowMap(MapArray)
         for x in range(MapArray.size):
             MapArray.itemset(x,0.5) #set all cell values to 0.5

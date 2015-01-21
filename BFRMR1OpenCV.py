@@ -73,11 +73,11 @@ def FindFirstEdge():
     #undistort image
     h, w = img.shape[:2]
     newcamera, roi = cv2.getOptimalNewCameraMatrix(K, d, (w,h), 0) 
-    img = cv2.undistort(img, K, d, None, newcamera)
+    #img = cv2.undistort(img, K, d, None, newcamera)
 
     imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)   #convert img to grayscale and store result in imgGray
     imgGray = cv2.bilateralFilter(imgGray,9,150,150) #blur the image slightly to remove noise             
-    imgEdge = cv2.Canny(imgGray, 15, 100)             #edge detection
+    imgEdge = cv2.Canny(imgGray, 50, 100)             #edge detection
 
     imagewidth = imgEdge.shape[1] - 1
     imageheight = imgEdge.shape[0] - 1
@@ -90,7 +90,7 @@ def FindFirstEdge():
                 EdgeArray.append((j,i))        #if it is, add x,y coordinates to ObstacleArray
                 break                          #if white pixel is found, skip rest of pixels in column
         else:                                  #no white pixel found
-            EdgeArray.append((j,20))            #if nothing found, assume no obstacle. Set pixel position way off the screen to indicate
+            EdgeArray.append((j,0))            #if nothing found, assume no obstacle. Set pixel position way off the screen to indicate
                                                #no obstacle detected
             
     
@@ -101,7 +101,7 @@ def FindFirstEdge():
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
-        cv2.waitKey(150)
+        cv2.waitKey(100)
 
     return EdgeArray
 
@@ -124,8 +124,6 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle,Scale):
         XDist = XScreen - 330.00
         XCamAngle = math.atan(XDist/612.00)
         XCamAngleDeg = math.degrees(XCamAngle )
-        #XAngleTotal = HeadPanAngle + XAngleDeg
-        
 
         YScreen = Point[1]
         YDist = 254.00 - YScreen
@@ -134,24 +132,44 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle,Scale):
 
         YAngleTotal = HeadTiltAngle + YCamAngleDeg
 
+        if YAngleTotal >= 0:
+            YAngleTotal = -1
+        #if YAngleTotal < 0 and YScreen > 0: #YAngle must be less than zero otherwise distance to object on the ground cannot be found
 
-        if YAngleTotal < 0 and YScreen > 0: #YAngle must be less than zero otherwise distance to object on the ground cannot be found
-            YAngleTotalRad = math.radians(90+YAngleTotal)
-            YCam = math.tan(YAngleTotalRad) * 23.5
-            YCam = YCam/math.cos(math.radians(XCamAngle))
-            XCam = math.tan(XCamAngle) * YCam
+        YAngleTotalRad = math.radians(90+YAngleTotal)
+        YCam = math.tan(YAngleTotalRad) * 23.5
+        YCam = YCam/math.cos(math.radians(XCamAngle))
+        XCam = math.tan(XCamAngle) * YCam
             #Rotate points around z axis by HeadPanAngle degrees
-            HeadPanRad = math.radians(HeadPanAngle)
-            XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
-            YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
+        HeadPanRad = math.radians(HeadPanAngle)
+        XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
+        YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
 
-            XWorld = XWorld/Scale
-            YWorld = YWorld/Scale
+        XWorld = XWorld/Scale
+        YWorld = YWorld/Scale
 
-            WorldArray.append((int(XWorld),int(YWorld)))
+        WorldArray.append((int(XWorld),int(YWorld)))
             
     
     return WorldArray
+
+##################################################################################################
+#
+# TidyMap - Experimental
+# Smooth, blur, threshold of map array
+#
+##################################################################################################
+def TidyMap(MapArray):
+
+    MapArray = cv2.GaussianBlur(MapArray,(5,5),0)
+
+    for x in range(MapArray.size):
+        if MapArray.item(x) > 0.6:
+            MapArray.itemset(x,1)
+        else:
+            MapArray.itemset(x,0)
+    
+    return MapArray
 
 
 
@@ -228,7 +246,7 @@ def ShowMap(MapArray):
     
     MapDisplay = cv2.cvtColor(MapArray, cv2.COLOR_GRAY2BGR)
     cv2.imshow("map", MapDisplay)
-    cv2.waitKey(150)
+    cv2.waitKey(100)
 
 
 
