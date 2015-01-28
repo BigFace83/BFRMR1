@@ -153,23 +153,6 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle,Scale):
     
     return WorldArray
 
-##################################################################################################
-#
-# TidyMap - Experimental
-# Smooth, blur, threshold of map array
-#
-##################################################################################################
-def TidyMap(MapArray):
-
-    MapArray = cv2.GaussianBlur(MapArray,(5,5),0)
-
-    for x in range(MapArray.size):
-        if MapArray.item(x) > 0.6:
-            MapArray.itemset(x,1)
-        else:
-            MapArray.itemset(x,0)
-    
-    return MapArray
 
 
 
@@ -236,6 +219,25 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre):
 
     return objects
  
+
+##################################################################################################
+#
+# NewMap - Experimental
+#
+##################################################################################################
+def NewMap(MapWidth, MapHeight):
+
+    MapArray = numpy.zeros((MapWidth, MapHeight), numpy.float32) #numpy array for map
+    for x in range(MapArray.size):
+        MapArray.itemset(x,0.5) #set all cell values to 0.5
+    for x in range(0,MapHeight,5):
+        MapArray.itemset(x,0,1)
+    
+    return MapArray
+
+
+
+
 ##################################################################################################
 #
 # ShowMap - Displays a map in an opencv window
@@ -247,6 +249,24 @@ def ShowMap(MapArray):
     MapDisplay = cv2.cvtColor(MapArray, cv2.COLOR_GRAY2BGR)
     cv2.imshow("map", MapDisplay)
     cv2.waitKey(100)
+
+##################################################################################################
+#
+# TidyMap - Experimental
+# Smooth, blur, threshold of map array
+#
+##################################################################################################
+def TidyMap(MapArray):
+
+    MapArray = cv2.GaussianBlur(MapArray,(5,5),0)
+
+    for x in range(MapArray.size):
+        if MapArray.item(x) > 0.6:
+            MapArray.itemset(x,1)
+        else:
+            MapArray.itemset(x,0)
+    
+    return MapArray
 
 
 
