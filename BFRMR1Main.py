@@ -47,9 +47,9 @@ VIEWDATASCREEN = 3
 TESTMOVESCREEN = 4
 STOPPINGSCREEN = 255
 
-MapWidth = 250
-MapHeight = 250
-MapScale = 1
+MapWidth = 800
+MapHeight = 800
+MapScale = 0.25
 
 
 # Data Packet from robot
@@ -70,7 +70,7 @@ MapScale = 1
 #
 ########################################################################################
 
-YELLOWOBJECTS = [10,150,150,50,255,255]
+YELLOWOBJECTS = [10,160,160,40,255,255]
 BLUEOBJECTS = [40,120,120,160,255,255]
 
 
@@ -281,23 +281,24 @@ def FindFoodTargets():
 
     FoodTargets = [] #create a main array to store all target coordinates found during scan
 
-    for x in range(-40,41,40):
-        HeadPanAngle = x
-        RobotData = HeadMove(HeadPanAngle,0, 3)
-        time.sleep(0.5) #small delay, let image settle
-        TargetCoords = BFRMR1OpenCV.FindObjects(YELLOWOBJECTS, 1000, RobotData[5])
-        if len(TargetCoords) > 0: #Targets found in current image frame
-            for x in range(0,len(TargetCoords),4): #cycle through coordinate values returned from image analysis
-                #convert from camera centred coordinates to robot centred coodinates
-                #taking account of head servo position
-                xrobotcoord = ((TargetCoords[x]-330.00)/10) + HeadPanAngle
-                FoodTargets.append(xrobotcoord)
-                yrobotcoord = (254.00-TargetCoords[x+1])/12
-                FoodTargets.append(yrobotcoord)
-                FoodTargets.append(TargetCoords[x+2]) #object size
-                FoodTargets.append(TargetCoords[x+3]) #object distance
+    for x in range(-20,11,5):
+        HeadTiltAngle = x
+        for y in range(-40,41,40):
+            HeadPanAngle = y
+            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)
+            time.sleep(0.25) #small delay, let image settle
+            TargetCoords = BFRMR1OpenCV.FindObjects(YELLOWOBJECTS, 1000, RobotData[5],HeadPanAngle,HeadTiltAngle,MapScale)
+            print "Target Coordinates",TargetCoords
+            BFRMR1OpenCV.AddToMap(MapArray,TargetCoords)
+            BFRMR1OpenCV.ShowMap(MapArray)
+            #if len(TargetCoords) > 0: #Targets found in current image frame
+            #    for x in range(0,len(TargetCoords),4): #cycle through coordinate values returned from image analysis
+            #       FoodTargets.append(TargetCoords[x])
+            #        FoodTargets.append(TargetCoords[x+1])
+                    #FoodTargets.append(TargetCoords[x+2]) #object size
+                    #FoodTargets.append(TargetCoords[x+3]) #object distance
    
-    
+                
     return FoodTargets
 
 ########################################################################################
@@ -637,35 +638,21 @@ while True:
     while RunForwardScan is True:
         
 
+        MapArray = BFRMR1OpenCV.NewMap(MapWidth,MapHeight)
+
         FoodTargets = FindFoodTargets() #look around for yellow objects
         if len(FoodTargets) is 0:
             print "No target found" #no target found
             PlayTone(1)      
         else:
             print "Target found at", FoodTargets
-            LargestObject = RankTargetsSize(FoodTargets) #find the largest target in the list
-            print "Largest target found at", LargestObject
-
-        for y in range(-20,1,30):
-            HeadTiltAngle = y
-            for x in range(-50,51,20):
-                HeadPanAngle = x
-                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 3)
-                time.sleep(0.1) #small delay to let image settle
-                a = BFRMR1OpenCV.FindFirstEdge()
-                WorldArray = BFRMR1OpenCV.FindWorldCoords(a,HeadPanAngle,HeadTiltAngle,MapScale)
-                MapArray = AddToMap(MapArray,WorldArray)
-                print "Add to Map"
-                BFRMR1OpenCV.ShowMap(MapArray)
-                
-        MapArray = BFRMR1OpenCV.TidyMap(MapArray)      
-        BFRMR1OpenCV.ShowMap(MapArray)
-        for x in range(MapArray.size):
-            MapArray.itemset(x,0.5) #set all cell values to 0.5
-        for x in range(0,MapHeight,5):
-            MapArray.itemset(x,0,1)
+            #LargestObject = RankTargetsSize(FoodTargets) #find the largest target in the list
+            #print "Largest target found at", LargestObject
             
 
+            
+                
+            
         if RunForwardScan is False:
             ScreenCounter = MAINSCREEN
             BFRMR1tft.MainScreen()

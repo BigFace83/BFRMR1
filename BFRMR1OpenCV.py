@@ -1,13 +1,14 @@
 
 # |B|I|G| |F|A|C|E| |R|O|B|O|T|I|C|S|
 
-import cv
+#import cv
 import cv2
 import numpy
 import sys
 import math
 
 DisplayImage = True
+
 
 print "Starting OpenCV"
 capture = cv2.VideoCapture(0)
@@ -162,10 +163,10 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle,Scale):
 # Maybe return object location information in the future for use in main program
 #
 ##################################################################################################
-def FindObjects(ThresholdArray, MinSize, DistanceAtCentre):
+def FindObjects(ThresholdArray, MinSize, DistanceAtCentre, HeadPanAngle, HeadTiltAngle, Scale):
 
     objects = [] #tuple to hold object information
-    
+    objectsbox = []
 
     #print "OpenCV capturing frames"
     ret,img = capture.read()
@@ -190,8 +191,6 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre):
         
         contourarea = cv2.contourArea(contours[x])
         if contourarea > MinSize:
-            #cnt = contours[x]
-            #cv2.drawContours(img, [cnt], 0, (0,255,0), 3)
 
             rect = cv2.minAreaRect(contours[x])
             box = cv2.cv.BoxPoints(rect)
@@ -202,22 +201,56 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre):
             boxcentrex = int(boxcentre[0])
             boxcentrey = int(boxcentre[1])
             cv2.circle(img, (boxcentrex, boxcentrey), 5, (0,255,0),-1) #draw a circle at centre point of object
+ 
+            #convert from screen coordinates to robot coordinates
+            XCam = boxcentrex - 330
+            YCam = boxcentrey - 254
+            z = 612.00 #camera focal length
+            HeadPanRad = math.radians(HeadPanAngle)
+            HeadTiltRad = math.radians(HeadTiltAngle)
+            #rotate about y
+            XRoboty = XCam*math.cos(HeadPanRad) + z*math.sin(HeadPanRad)
+            YRoboty = YCam
 
-            #thisobject = (boxcentrex,boxcentrey,contourarea)
-            #objects = objects + (thisobject,)
-          
-            objects.append(boxcentrex)
-            objects.append(boxcentrey)
+            #rotate about x
+            XRobot = XRoboty
+            YRobot = YRoboty*math.cos(HeadTiltRad) - z*math.sin(HeadTiltRad)
+
+            
+            objects.append(XRobot*Scale)
+            objects.append(YRobot*Scale)
             objects.append(contourarea)
             objects.append(DistanceAtCentre)
 
+            print "Box Before",box
+
+            for x in range (len(box)):
+                box_x = box[x][0]
+                box_y = box[x][1]
+                #rotate about y
+                XRoboty = box_x*math.cos(HeadPanRad) + z*math.sin(HeadPanRad)
+                YRoboty = box_y
+                #rotate about x
+                XRobot = XRoboty
+                YRobot = YRoboty*math.cos(HeadTiltRad) - z*math.sin(HeadTiltRad)
+                
+                box[x][0] = XRobot
+                box[x][1] = YRobot
+
+                
+
+            print "Box After",box
+            objectsbox.append(box)
+            
+
+    #write sonar reading to image
     cv2.putText(img,str(DistanceAtCentre)+"cm", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
-        cv2.waitKey(120)
-
-    return objects
+        cv2.waitKey(50)
+    print "Objectsbox", objectsbox
+    return objectsbox
  
 
 ##################################################################################################
@@ -230,12 +263,36 @@ def NewMap(MapWidth, MapHeight):
     MapArray = numpy.zeros((MapWidth, MapHeight), numpy.float32) #numpy array for map
     for x in range(MapArray.size):
         MapArray.itemset(x,0.5) #set all cell values to 0.5
-    for x in range(0,MapHeight,5):
-        MapArray.itemset(x,0,1)
+    
     
     return MapArray
 
+##################################################################################################
+#
+# AddToMap - 
+#
+##################################################################################################
+def AddToMap(MapArray,Objects):
+    
+    Width = MapArray.shape[1]
+    Height = MapArray.shape[0]
+    #need to convert from robot coords to map coords, 0,0 is centre of map.
+    print "Length of objects", len(Objects)
 
+    for x in range (len(Objects)):
+        for y in range(len(Objects[x])):
+            Objects[x][y][0] = (Width/2) + int(Objects[x][y][0])
+            Objects[x][y][1] = (Height/2) + int(Objects[x][y][1])
+        pts = Objects[x].reshape((-1,1,2))
+        cv2.fillPoly(MapArray,[pts],True,1)
+        #cv2.drawContours(MapArray,[[194, 516],[194, 456],[285, 456],[285, 516]],0,1,1)
+
+    #for x in range(0,len(Objects),4):
+    #    X = (Width/2) +  (int(Objects[x]))
+     #   Y = (Height/2) + (int(Objects[x+1]))
+     #   cv2.circle(MapArray, (X, Y), 5, 1,-1) #draw a circle at centre point of object
+        
+    
 
 
 ##################################################################################################
@@ -248,7 +305,7 @@ def ShowMap(MapArray):
     
     MapDisplay = cv2.cvtColor(MapArray, cv2.COLOR_GRAY2BGR)
     cv2.imshow("map", MapDisplay)
-    cv2.waitKey(100)
+    cv2.waitKey(50)
 
 ##################################################################################################
 #
