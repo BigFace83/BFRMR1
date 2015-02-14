@@ -22,7 +22,6 @@ import BFRMR1OpenCV
 import numpy
 import math
 
-
 GPIO.setup(4, GPIO.IN) #Buttons
 GPIO.setup(17, GPIO.IN)
 GPIO.setup(21, GPIO.IN)
@@ -47,9 +46,9 @@ VIEWDATASCREEN = 3
 TESTMOVESCREEN = 4
 STOPPINGSCREEN = 255
 
-MapWidth = 800
-MapHeight = 800
-MapScale = 0.25
+MapWidth = 200
+MapHeight = 200
+MapScale = 10 #Map is divided by scale value. The higher the value, the smaller the map
 
 
 # Data Packet from robot
@@ -281,12 +280,12 @@ def FindFoodTargets():
 
     FoodTargets = [] #create a main array to store all target coordinates found during scan
 
-    for x in range(-20,11,5):
+    for x in range(-20,21,20):
         HeadTiltAngle = x
-        for y in range(-40,41,40):
+        for y in range(-50,51,50):
             HeadPanAngle = y
-            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)
-            time.sleep(0.25) #small delay, let image settle
+            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 7)
+            time.sleep(0.5) #small delay, let image settle
             TargetCoords = BFRMR1OpenCV.FindObjects(YELLOWOBJECTS, 1000, RobotData[5],HeadPanAngle,HeadTiltAngle,MapScale)
             print "Target Coordinates",TargetCoords
             BFRMR1OpenCV.AddToMap(MapArray,TargetCoords)
@@ -637,15 +636,25 @@ while True:
 
     while RunForwardScan is True:
         
+        for x in range(-10,11,10):
+            HeadTiltAngle = x
+            for y in range(-40,41,10):
+                HeadPanAngle = y
+                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
+                time.sleep(0.25) #small delay, let image settle
+                print "Scanning image"
+                BFRMR1OpenCV.ReadQRCode()
 
-        MapArray = BFRMR1OpenCV.NewMap(MapWidth,MapHeight)
+        #MapArray = BFRMR1OpenCV.NewMap(MapWidth,MapHeight)
+        
+    
 
-        FoodTargets = FindFoodTargets() #look around for yellow objects
-        if len(FoodTargets) is 0:
-            print "No target found" #no target found
-            PlayTone(1)      
-        else:
-            print "Target found at", FoodTargets
+        #FoodTargets = FindFoodTargets() #look around for yellow objects
+        #if len(FoodTargets) is 0:
+        #    print "No target found" #no target found
+        #    PlayTone(1)      
+        #else:
+        #    print "Target found at", FoodTargets
             #LargestObject = RankTargetsSize(FoodTargets) #find the largest target in the list
             #print "Largest target found at", LargestObject
             

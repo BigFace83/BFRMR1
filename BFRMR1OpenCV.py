@@ -6,29 +6,30 @@ import cv2
 import numpy
 import sys
 import math
+import zbar
 
-DisplayImage = True
+DisplayImage = False
 
 
 print "Starting OpenCV"
 capture = cv2.VideoCapture(0)
 
-capture.set(3,640) #1024 640
-capture.set(4,480) #600 480
+capture.set(3,640) #1024 640 1280 800 384
+capture.set(4,480) #600 480 960 600 288
 
 if DisplayImage is True:
     cv2.namedWindow("camera", 0)
     cv2.namedWindow("map", 0)
     print "Creating OpenCV windows"
-    cv2.waitKey(200)
+    cv2.waitKey(50)
     cv2.resizeWindow("camera", 640,480) 
     cv2.resizeWindow("map", 600,600) 
     print "Resizing OpenCV windows"
-    cv2.waitKey(200)
+    cv2.waitKey(50)
     cv2.moveWindow("camera", 400,30)
     cv2.moveWindow("map", 1100,30)
     print "Moving OpenCV window"
-    cv2.waitKey(200)
+    cv2.waitKey(50)
 
 
 ##################################################################################################
@@ -45,7 +46,7 @@ def DisplayFrame():
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
 
     cv2.imshow("camera", img)
-    cv2.waitKey(120)
+    cv2.waitKey(100)
 
 ##################################################################################################
 #
@@ -105,6 +106,66 @@ def FindFirstEdge():
         cv2.waitKey(100)
 
     return EdgeArray
+
+##################################################################################################
+#
+# ReadQRCode
+#
+#
+##################################################################################################
+def ReadQRCode():
+
+    Data = 0
+    Location = 0
+
+    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
+    ret,img = capture.read() 
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read() #5 seems to be enough
+
+    img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)   #convert img to grayscale and store result in imgGray
+    
+    height, width = img.shape[:2] #get height and width of img
+ 
+    # wrap image data
+    image = zbar.Image(width, height, 'Y800', img.tostring())
+    scanner = zbar.ImageScanner()
+    scanner.parse_config('enable')
+    # scan the image for barcodes
+    scanner.scan(image)
+
+    for symbol in image:
+        # do something useful with results
+        
+        #print 'decoded', symbol.type, 'symbol', '"%s"' % symbol.data
+        #print "Data ",symbol.data
+        #print "Type ",symbol.type
+        #print "Location ",symbol.location
+
+        Data = symbol.data
+        Location = symbol.location 
+
+        
+      
+    if Data is 0:
+        print "No QRCode found in image"
+
+    else:
+        print "Found", Data
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        for x in range (len(Location)):
+            cv2.circle(img, Location[x], 5, (0,0,255),-1)       
+        for x in range (len(Location)-1):
+            cv2.line(img,Location[x],Location[x+1], (0,0,255),3)
+        cv2.line(img,Location[0],Location[3], (0,0,255),3)
+        cv2.putText(img,str(symbol.data), (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
+
+    if DisplayImage is True:
+        cv2.imshow("camera", img)
+        cv2.waitKey(50)
+
+
 
 
 ##################################################################################################
@@ -217,16 +278,16 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre, HeadPanAngle, HeadTil
             YRobot = YRoboty*math.cos(HeadTiltRad) - z*math.sin(HeadTiltRad)
 
             
-            objects.append(XRobot*Scale)
-            objects.append(YRobot*Scale)
+            objects.append(XRobot/Scale)
+            objects.append(YRobot/Scale)
             objects.append(contourarea)
             objects.append(DistanceAtCentre)
 
             print "Box Before",box
 
             for x in range (len(box)):
-                box_x = box[x][0]
-                box_y = box[x][1]
+                box_x = box[x][0] - 330
+                box_y = box[x][1] - 254
                 #rotate about y
                 XRoboty = box_x*math.cos(HeadPanRad) + z*math.sin(HeadPanRad)
                 YRoboty = box_y
@@ -234,8 +295,8 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre, HeadPanAngle, HeadTil
                 XRobot = XRoboty
                 YRobot = YRoboty*math.cos(HeadTiltRad) - z*math.sin(HeadTiltRad)
                 
-                box[x][0] = XRobot
-                box[x][1] = YRobot
+                box[x][0] = XRobot/Scale
+                box[x][1] = YRobot/Scale
 
                 
 
@@ -249,6 +310,7 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre, HeadPanAngle, HeadTil
     if DisplayImage is True:
         cv2.imshow("camera", img)
         cv2.waitKey(50)
+    
     print "Objectsbox", objectsbox
     return objectsbox
  
