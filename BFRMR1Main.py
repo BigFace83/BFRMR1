@@ -636,14 +636,15 @@ while True:
 
     while RunForwardScan is True:
         
-        for x in range(-10,11,10):
-            HeadTiltAngle = x
-            for y in range(-40,41,10):
-                HeadPanAngle = y
-                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
-                time.sleep(0.25) #small delay, let image settle
-                print "Scanning image"
-                BFRMR1OpenCV.ReadQRCode()
+        #for x in range(-10,11,10):
+        #    HeadTiltAngle = x
+        #    for y in range(-40,41,10):
+        #        HeadPanAngle = y
+        #         RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
+        RobotData = HeadMove(0,0, 8)
+        time.sleep(0.1) #small delay, let image settle
+        print "Scanning image"
+        BFRMR1OpenCV.ReadQRCode()
 
         #MapArray = BFRMR1OpenCV.NewMap(MapWidth,MapHeight)
         

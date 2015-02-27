@@ -8,7 +8,7 @@ import sys
 import math
 import zbar
 
-DisplayImage = False
+DisplayImage = True
 
 
 print "Starting OpenCV"
@@ -63,7 +63,7 @@ def FindFirstEdge():
     EdgeArray = []
 
     #camera calibration values
-    K = numpy.array([[612.00, 0, 330.00], [0, 613.00, 254.00], [0, 0, 1]])
+    K = numpy.array([[640.00, 0, 330.00], [0, 613.00, 254.00], [0, 0, 1]])
     d = numpy.array([0.05897, -0.4494, 0, 0, 0]) # just use first two terms (no translation)
 
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
@@ -103,7 +103,7 @@ def FindFirstEdge():
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
-        cv2.waitKey(100)
+        cv2.waitKey(50)
 
     return EdgeArray
 
@@ -124,12 +124,12 @@ def ReadQRCode():
     ret,img = capture.read()
     ret,img = capture.read() #5 seems to be enough
 
-    img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)   #convert img to grayscale and store result in imgGray
+    imggray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)   #convert img to grayscale and store result in imgGray
     
-    height, width = img.shape[:2] #get height and width of img
+    height, width = imggray.shape[:2] #get height and width of img
  
     # wrap image data
-    image = zbar.Image(width, height, 'Y800', img.tostring())
+    image = zbar.Image(width, height, 'Y800', imggray.tostring())
     scanner = zbar.ImageScanner()
     scanner.parse_config('enable')
     # scan the image for barcodes
@@ -153,13 +153,27 @@ def ReadQRCode():
 
     else:
         print "Found", Data
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        #Find lengths of the 4 sides of the qr code
+        QRWidth0 = Location[1][1] - Location[0][1]
+        QRWidth1 = Location[2][0] - Location[1][0]
+        QRWidth2 = Location[2][1] - Location[3][1]
+        QRWidth3 = Location[3][0] - Location[0][0]
+        #Find the average of the 4 sides
+        QRSize = (QRWidth0+QRWidth1+QRWidth2+QRWidth3)/4
+        print "QRsize", QRSize
+        #Work out distance from camera to QR Code
+        QRDistance = (640.00*106)/QRSize #focal length x QRCode width / size of QRCode
+        print "Distance to QR Code", QRDistance,"mm"
+
+
         for x in range (len(Location)):
-            cv2.circle(img, Location[x], 5, (0,0,255),-1)       
+            cv2.circle(img, Location[x], 3, (0,0,255),-1)       
         for x in range (len(Location)-1):
             cv2.line(img,Location[x],Location[x+1], (0,0,255),3)
-        cv2.line(img,Location[0],Location[3], (0,0,255),3)
-        cv2.putText(img,str(symbol.data), (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
+        cv2.line(img,Location[0],Location[3], (0,0,255),2)
+        TextForScreen = str(symbol.data) + " at " + "%.2f" % QRDistance + "mm"
+        cv2.putText(img,TextForScreen, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
+        
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
