@@ -48,7 +48,7 @@ STOPPINGSCREEN = 255
 
 MapWidth = 200
 MapHeight = 200
-MapScale = 10 #Map is divided by scale value. The higher the value, the smaller the map
+MapScale = 5 #Map is divided by scale value. The higher the value, the smaller the map
 
 
 # Data Packet from robot
@@ -71,6 +71,7 @@ MapScale = 10 #Map is divided by scale value. The higher the value, the smaller 
 
 YELLOWOBJECTS = [10,160,160,40,255,255]
 BLUEOBJECTS = [40,120,120,160,255,255]
+ORANGEOBJECTS = [5,170,170,15,255,255]
 
 
 
@@ -640,11 +641,10 @@ while True:
         #    HeadTiltAngle = x
         #    for y in range(-40,41,10):
         #        HeadPanAngle = y
-        #         RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
-        RobotData = HeadMove(0,0, 8)
-        time.sleep(0.1) #small delay, let image settle
-        print "Scanning image"
-        BFRMR1OpenCV.ReadQRCode()
+        #        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
+        #        time.sleep(0.1) #small delay, let image settle
+        #        print "Scanning image"
+        #        BFRMR1OpenCV.ReadQRCode()
 
         #MapArray = BFRMR1OpenCV.NewMap(MapWidth,MapHeight)
         
@@ -658,18 +658,18 @@ while True:
         #    print "Target found at", FoodTargets
             #LargestObject = RankTargetsSize(FoodTargets) #find the largest target in the list
             #print "Largest target found at", LargestObject
-            
 
-            
-                
-            
+        print "Find Ball"
+        BallCentre = BFRMR1OpenCV.FindBall(ORANGEOBJECTS)
+        if BallCentre is 0:
+            print "Ball not found in image"
+        else:
+            print BallCentre
+        
         if RunForwardScan is False:
             ScreenCounter = MAINSCREEN
             BFRMR1tft.MainScreen()
             BFRMR1tft.EditMainScreen(PointerCounterMain)
-
-
-
 
 
 BFRMR1serialport.closeserial()  

@@ -21,11 +21,11 @@ if DisplayImage is True:
     cv2.namedWindow("camera", 0)
     cv2.namedWindow("map", 0)
     print "Creating OpenCV windows"
-    cv2.waitKey(50)
+    #cv2.waitKey(50)
     cv2.resizeWindow("camera", 640,480) 
     cv2.resizeWindow("map", 600,600) 
     print "Resizing OpenCV windows"
-    cv2.waitKey(50)
+    #cv2.waitKey(50)
     cv2.moveWindow("camera", 400,30)
     cv2.moveWindow("map", 1100,30)
     print "Moving OpenCV window"
@@ -46,7 +46,7 @@ def DisplayFrame():
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
 
     cv2.imshow("camera", img)
-    cv2.waitKey(100)
+    cv2.waitKey(10)
 
 ##################################################################################################
 #
@@ -103,14 +103,15 @@ def FindFirstEdge():
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
-        cv2.waitKey(50)
+        cv2.waitKey(10)
 
     return EdgeArray
 
 ##################################################################################################
 #
 # ReadQRCode
-#
+# Scans the image for a QR code and then reads it. Also uses focal length of the camera and the 
+# known width of the QR code to calculate the approximate distance to the QR code from the camera.
 #
 ##################################################################################################
 def ReadQRCode():
@@ -177,9 +178,55 @@ def ReadQRCode():
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
-        cv2.waitKey(50)
+        cv2.waitKey(10)
 
+##################################################################################################
+#
+# FindBall
+#
+#
+##################################################################################################
 
+def FindBall(ThresholdArray):
+
+    boxcentre = 0
+    
+    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
+    ret,img = capture.read() 
+    ret,img = capture.read()
+    ret,img = capture.read()
+    ret,img = capture.read() #5 seems to be enough
+
+    imgHSV = cv2.cvtColor(img,cv2.COLOR_BGR2HSV) #convert img to HSV and store result in imgHSVyellow
+    lower = numpy.array([ThresholdArray[0],ThresholdArray[1],ThresholdArray[2]]) #numpy arrays for upper and lower thresholds
+    upper = numpy.array([ThresholdArray[3], ThresholdArray[4], ThresholdArray[5]])
+
+    imgthreshed = cv2.inRange(imgHSV, lower, upper) #threshold imgHSV
+    imgthreshed = cv2.blur(imgthreshed,(3,3))
+
+    contours, hierarchy = cv2.findContours(imgthreshed,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    
+    for x in range (len(contours)):
+        
+        contourarea = cv2.contourArea(contours[x])
+        if contourarea > 1000:
+
+            rect = cv2.minAreaRect(contours[x])
+            box = cv2.cv.BoxPoints(rect)
+            box = numpy.int0(box)
+            cv2.drawContours(img,[box],0,(0,160,255),1)
+
+            boxcentre = rect[0] #get centre coordinates of each object
+            boxcentrex = int(boxcentre[0])
+            boxcentrey = int(boxcentre[1])
+            cv2.circle(img, (boxcentrex, boxcentrey), 5, (0,160,255),-1) #draw a circle at centre point of object
+      
+
+    if DisplayImage is True:
+        cv2.imshow("camera", img)
+        cv2.waitKey(10)
+
+    return boxcentre
 
 
 ##################################################################################################
@@ -323,7 +370,7 @@ def FindObjects(ThresholdArray, MinSize, DistanceAtCentre, HeadPanAngle, HeadTil
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
-        cv2.waitKey(50)
+        cv2.waitKey(10)
     
     print "Objectsbox", objectsbox
     return objectsbox
