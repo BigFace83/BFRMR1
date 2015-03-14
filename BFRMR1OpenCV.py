@@ -3,7 +3,7 @@
 
 #import cv
 import cv2
-import numpy
+import numpy as np
 import sys
 import math
 import zbar
@@ -63,8 +63,8 @@ def FindFirstEdge():
     EdgeArray = []
 
     #camera calibration values
-    K = numpy.array([[640.00, 0, 330.00], [0, 613.00, 254.00], [0, 0, 1]])
-    d = numpy.array([0.05897, -0.4494, 0, 0, 0]) # just use first two terms (no translation)
+    K = np.array([[640.00, 0, 320.00], [0, 613.00, 240.00], [0, 0, 1]])
+    d = np.array([0.05897, -0.4494, 0, 0, 0]) # just use first two terms (no translation)
 
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
     ret,img = capture.read() 
@@ -118,6 +118,7 @@ def ReadQRCode():
 
     Data = 0
     Location = 0
+    ReturnData = 0
 
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
     ret,img = capture.read() 
@@ -126,7 +127,6 @@ def ReadQRCode():
     ret,img = capture.read() #5 seems to be enough
 
     imggray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)   #convert img to grayscale and store result in imgGray
-    
     height, width = imggray.shape[:2] #get height and width of img
  
     # wrap image data
@@ -137,23 +137,17 @@ def ReadQRCode():
     scanner.scan(image)
 
     for symbol in image:
-        # do something useful with results
-        
-        #print 'decoded', symbol.type, 'symbol', '"%s"' % symbol.data
-        #print "Data ",symbol.data
-        #print "Type ",symbol.type
-        #print "Location ",symbol.location
-
         Data = symbol.data
         Location = symbol.location 
-
+  
+    if Data is 0: #No QR Code found
+        ReturnData = 0
         
-      
-    if Data is 0:
-        print "No QRCode found in image"
-
     else:
         print "Found", Data
+        #Find centre point of QR Code
+        CentreY = Location[0][1] + ((Location[1][1]-Location[0][1])/2)
+        CentreX = Location[0][0] + ((Location[3][0]-Location[0][0])/2)
         #Find lengths of the 4 sides of the qr code
         QRWidth0 = Location[1][1] - Location[0][1]
         QRWidth1 = Location[2][0] - Location[1][0]
@@ -162,28 +156,37 @@ def ReadQRCode():
         #Find the average of the 4 sides
         QRSize = (QRWidth0+QRWidth1+QRWidth2+QRWidth3)/4
         print "QRsize", QRSize
-        #Work out distance from camera to QR Code
-        QRDistance = (640.00*106)/QRSize #focal length x QRCode width / size of QRCode
-        print "Distance to QR Code", QRDistance,"mm"
+        #Work out distance from camera to QR Code in CM
+        QRDistance = (640.00*10.6)/QRSize #focal length x QRCode width / size of QRCode
+        print "Distance to QR Code", QRDistance,"cm"
 
+    ############################################################################################
+    #
+    # Draw box around QR code and write distance to screen 
 
-        for x in range (len(Location)):
-            cv2.circle(img, Location[x], 3, (0,0,255),-1)       
         for x in range (len(Location)-1):
-            cv2.line(img,Location[x],Location[x+1], (0,0,255),3)
-        cv2.line(img,Location[0],Location[3], (0,0,255),2)
-        TextForScreen = str(symbol.data) + " at " + "%.2f" % QRDistance + "mm"
+            cv2.line(img,Location[x],Location[x+1], (0,0,255),1)
+        cv2.line(img,Location[0],Location[3], (0,0,255),1)
+        #Draw Circle at centre point
+        cv2.circle(img, (CentreX, CentreY), 3, (0,255,0),-1) #draw a circle at centre point of object
+        #Write distance to QR code to the screen
+        TextForScreen = str(symbol.data) + " at " + "%.2f" % QRDistance + "cm"
         cv2.putText(img,TextForScreen, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
+
+  
+        ReturnData = [Data,CentreX,CentreY,QRDistance]
         
 
     if DisplayImage is True:
         cv2.imshow("camera", img)
         cv2.waitKey(10)
 
+    return ReturnData
+    
+
 ##################################################################################################
 #
 # FindBall
-#
 #
 ##################################################################################################
 
@@ -198,8 +201,8 @@ def FindBall(ThresholdArray):
     ret,img = capture.read() #5 seems to be enough
 
     imgHSV = cv2.cvtColor(img,cv2.COLOR_BGR2HSV) #convert img to HSV and store result in imgHSVyellow
-    lower = numpy.array([ThresholdArray[0],ThresholdArray[1],ThresholdArray[2]]) #numpy arrays for upper and lower thresholds
-    upper = numpy.array([ThresholdArray[3], ThresholdArray[4], ThresholdArray[5]])
+    lower = np.array([ThresholdArray[0],ThresholdArray[1],ThresholdArray[2]]) #np arrays for upper and lower thresholds
+    upper = np.array([ThresholdArray[3], ThresholdArray[4], ThresholdArray[5]])
 
     imgthreshed = cv2.inRange(imgHSV, lower, upper) #threshold imgHSV
     imgthreshed = cv2.blur(imgthreshed,(3,3))
@@ -213,7 +216,7 @@ def FindBall(ThresholdArray):
 
             rect = cv2.minAreaRect(contours[x])
             box = cv2.cv.BoxPoints(rect)
-            box = numpy.int0(box)
+            box = np.int0(box)
             cv2.drawContours(img,[box],0,(0,160,255),1)
 
             boxcentre = rect[0] #get centre coordinates of each object
@@ -279,113 +282,17 @@ def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle,Scale):
 
 
 
-##################################################################################################
-#
-# Find objects - Find objects of colour determined by threshold values passed to function
-# Maybe return object location information in the future for use in main program
-#
-##################################################################################################
-def FindObjects(ThresholdArray, MinSize, DistanceAtCentre, HeadPanAngle, HeadTiltAngle, Scale):
-
-    objects = [] #tuple to hold object information
-    objectsbox = []
-
-    #print "OpenCV capturing frames"
-    ret,img = capture.read()
-    ret,img = capture.read()
-    ret,img = capture.read()
-    ret,img = capture.read()
-    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
-
-
-    #print "OpenCV processing"
-    imgHSV = cv2.cvtColor(img,cv2.COLOR_BGR2HSV) #convert img to HSV and store result in imgHSVyellow
-    lower = numpy.array([ThresholdArray[0],ThresholdArray[1],ThresholdArray[2]]) #numpy arrays for upper and lower thresholds
-    upper = numpy.array([ThresholdArray[3], ThresholdArray[4], ThresholdArray[5]])
-    frame_threshed = cv2.inRange(imgHSV, lower, upper) #threshold imgHSV
-    frame_threshed = cv2.blur(frame_threshed,(5,5))
-
-
-    #playing around with contours
-    contours, hierarchy = cv2.findContours(frame_threshed,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    
-    for x in range (len(contours)):
-        
-        contourarea = cv2.contourArea(contours[x])
-        if contourarea > MinSize:
-
-            rect = cv2.minAreaRect(contours[x])
-            box = cv2.cv.BoxPoints(rect)
-            box = numpy.int0(box)
-            cv2.drawContours(img,[box],0,(0,255,0),1) 
-
-            boxcentre = rect[0] #get centre coordinates of each object
-            boxcentrex = int(boxcentre[0])
-            boxcentrey = int(boxcentre[1])
-            cv2.circle(img, (boxcentrex, boxcentrey), 5, (0,255,0),-1) #draw a circle at centre point of object
- 
-            #convert from screen coordinates to robot coordinates
-            XCam = boxcentrex - 330
-            YCam = boxcentrey - 254
-            z = 612.00 #camera focal length
-            HeadPanRad = math.radians(HeadPanAngle)
-            HeadTiltRad = math.radians(HeadTiltAngle)
-            #rotate about y
-            XRoboty = XCam*math.cos(HeadPanRad) + z*math.sin(HeadPanRad)
-            YRoboty = YCam
-
-            #rotate about x
-            XRobot = XRoboty
-            YRobot = YRoboty*math.cos(HeadTiltRad) - z*math.sin(HeadTiltRad)
-
-            
-            objects.append(XRobot/Scale)
-            objects.append(YRobot/Scale)
-            objects.append(contourarea)
-            objects.append(DistanceAtCentre)
-
-            print "Box Before",box
-
-            for x in range (len(box)):
-                box_x = box[x][0] - 330
-                box_y = box[x][1] - 254
-                #rotate about y
-                XRoboty = box_x*math.cos(HeadPanRad) + z*math.sin(HeadPanRad)
-                YRoboty = box_y
-                #rotate about x
-                XRobot = XRoboty
-                YRobot = YRoboty*math.cos(HeadTiltRad) - z*math.sin(HeadTiltRad)
-                
-                box[x][0] = XRobot/Scale
-                box[x][1] = YRobot/Scale
-
-                
-
-            print "Box After",box
-            objectsbox.append(box)
-            
-
-    #write sonar reading to image
-    cv2.putText(img,str(DistanceAtCentre)+"cm", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
-
-    if DisplayImage is True:
-        cv2.imshow("camera", img)
-        cv2.waitKey(10)
-    
-    print "Objectsbox", objectsbox
-    return objectsbox
- 
 
 ##################################################################################################
 #
-# NewMap - Experimental
+# NewMap - Creates a new map
 #
 ##################################################################################################
+
 def NewMap(MapWidth, MapHeight):
 
-    MapArray = numpy.zeros((MapWidth, MapHeight), numpy.float32) #numpy array for map
-    for x in range(MapArray.size):
-        MapArray.itemset(x,0.5) #set all cell values to 0.5
+    MapArray = np.ones((MapHeight,MapWidth,3), np.uint8)
+    MapArray[:MapWidth] = (255,255,255)      # (B, G, R)
     
     
     return MapArray
@@ -395,58 +302,31 @@ def NewMap(MapWidth, MapHeight):
 # AddToMap - 
 #
 ##################################################################################################
-def AddToMap(MapArray,Objects):
+
+def AddToMap(MapArray,X,Y,Type):
     
     Width = MapArray.shape[1]
     Height = MapArray.shape[0]
-    #need to convert from robot coords to map coords, 0,0 is centre of map.
-    print "Length of objects", len(Objects)
+    print Type, "in AddToMap"
 
-    for x in range (len(Objects)):
-        for y in range(len(Objects[x])):
-            Objects[x][y][0] = (Width/2) + int(Objects[x][y][0])
-            Objects[x][y][1] = (Height/2) + int(Objects[x][y][1])
-        pts = Objects[x].reshape((-1,1,2))
-        cv2.fillPoly(MapArray,[pts],True,1)
-        #cv2.drawContours(MapArray,[[194, 516],[194, 456],[285, 456],[285, 516]],0,1,1)
+    if Type == 'FOOD':      
+        cv2.circle(MapArray, (X, Y), 2, (0,0,255),-1) #draw a circle
+    elif Type == 'HOME':      
+        cv2.circle(MapArray, (X, Y), 2, (0,255,0),-1) #draw a circle
 
-    #for x in range(0,len(Objects),4):
-    #    X = (Width/2) +  (int(Objects[x]))
-     #   Y = (Height/2) + (int(Objects[x+1]))
-     #   cv2.circle(MapArray, (X, Y), 5, 1,-1) #draw a circle at centre point of object
-        
+    return MapArray
     
-
-
 ##################################################################################################
 #
 # ShowMap - Displays a map in an opencv window
 # MapArray is a numpy array where each element has a value between 0 and 1
 #
 ##################################################################################################
+
 def ShowMap(MapArray):
     
-    MapDisplay = cv2.cvtColor(MapArray, cv2.COLOR_GRAY2BGR)
-    cv2.imshow("map", MapDisplay)
+    cv2.imshow("map", MapArray)
     cv2.waitKey(50)
-
-##################################################################################################
-#
-# TidyMap - Experimental
-# Smooth, blur, threshold of map array
-#
-##################################################################################################
-def TidyMap(MapArray):
-
-    MapArray = cv2.GaussianBlur(MapArray,(5,5),0)
-
-    for x in range(MapArray.size):
-        if MapArray.item(x) > 0.6:
-            MapArray.itemset(x,1)
-        else:
-            MapArray.itemset(x,0)
-    
-    return MapArray
 
 
 
