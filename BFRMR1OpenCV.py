@@ -148,17 +148,25 @@ def ReadQRCode():
         #Find centre point of QR Code
         CentreY = Location[0][1] + ((Location[1][1]-Location[0][1])/2)
         CentreX = Location[0][0] + ((Location[3][0]-Location[0][0])/2)
-        #Find lengths of the 4 sides of the qr code
-        QRWidth0 = Location[1][1] - Location[0][1]
-        QRWidth1 = Location[2][0] - Location[1][0]
-        QRWidth2 = Location[2][1] - Location[3][1]
-        QRWidth3 = Location[3][0] - Location[0][0]
-        #Find the average of the 4 sides
-        QRSize = (QRWidth0+QRWidth1+QRWidth2+QRWidth3)/4
+        #Find lengths of the 4 sides of the QR code
+        QRWidths = []
+        QRWidths.append(Location[1][1] - Location[0][1])
+        QRWidths.append(Location[2][0] - Location[1][0])
+        QRWidths.append(Location[2][1] - Location[3][1])
+        QRWidths.append(Location[3][0] - Location[0][0])
+        #Find the longest side of the QR Code
+        LongestSide = 0
+        for x in range (len(QRWidths)):
+            if QRWidths[x] > LongestSide:
+                LongestSide = QRWidths[x]
+            
+        QRSize = LongestSide
         print "QRsize", QRSize
         #Work out distance from camera to QR Code in CM
         QRDistance = (640.00*10.6)/QRSize #focal length x QRCode width / size of QRCode
         print "Distance to QR Code", QRDistance,"cm"
+
+        
 
     ############################################################################################
     #
@@ -173,7 +181,6 @@ def ReadQRCode():
         TextForScreen = str(symbol.data) + " at " + "%.2f" % QRDistance + "cm"
         cv2.putText(img,TextForScreen, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
 
-  
         ReturnData = [Data,CentreX,CentreY,QRDistance]
         
 
@@ -186,11 +193,11 @@ def ReadQRCode():
 
 ##################################################################################################
 #
-# FindBall
+# FindQRBorder
 #
 ##################################################################################################
 
-def FindBall(ThresholdArray):
+def FindQRBorder(ThresholdArray):
 
     boxcentre = 0
     
@@ -212,17 +219,17 @@ def FindBall(ThresholdArray):
     for x in range (len(contours)):
         
         contourarea = cv2.contourArea(contours[x])
-        if contourarea > 1000:
+        if contourarea > 200:
 
             rect = cv2.minAreaRect(contours[x])
             box = cv2.cv.BoxPoints(rect)
             box = np.int0(box)
-            cv2.drawContours(img,[box],0,(0,160,255),1)
+            cv2.drawContours(img,[box],0,(0,255,0),1)
 
             boxcentre = rect[0] #get centre coordinates of each object
             boxcentrex = int(boxcentre[0])
             boxcentrey = int(boxcentre[1])
-            cv2.circle(img, (boxcentrex, boxcentrey), 5, (0,160,255),-1) #draw a circle at centre point of object
+            cv2.circle(img, (boxcentrex, boxcentrey), 5, (0,255,0),-1) #draw a circle at centre point of object
       
 
     if DisplayImage is True:

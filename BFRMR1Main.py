@@ -22,10 +22,12 @@ import os
 import BFRMR1OpenCV
 import numpy
 import math
+from colorama import init,Fore
+init(autoreset=True)
 
 GPIO.setup(4, GPIO.IN) #Buttons
 GPIO.setup(17, GPIO.IN)
-GPIO.setup(21, GPIO.IN)
+GPIO.setup(27, GPIO.IN)
 GPIO.setup(22, GPIO.IN)
 
 TurnRatio = 3.4
@@ -54,7 +56,7 @@ MapScale = 2 #Map is divided by scale value. The higher the value, the smaller t
 #
 ########################################################################################
 
-YELLOWOBJECTS = [10,160,160,40,255,255]
+YELLOWOBJECTS = [15,130,110,30,255,255]
 BLUEOBJECTS = [40,120,120,160,255,255]
 ORANGEOBJECTS = [5,170,170,15,255,255]
 
@@ -216,7 +218,7 @@ def Button3Pressed(channel):
 
 GPIO.add_event_detect(4,  GPIO.FALLING, callback=Button0Pressed, bouncetime=200)
 GPIO.add_event_detect(17, GPIO.FALLING, callback=Button1Pressed, bouncetime=200)
-GPIO.add_event_detect(21, GPIO.FALLING, callback=Button2Pressed, bouncetime=200)
+GPIO.add_event_detect(27, GPIO.FALLING, callback=Button2Pressed, bouncetime=200)
 GPIO.add_event_detect(22, GPIO.FALLING, callback=Button3Pressed, bouncetime=200)
 
 while True:
@@ -230,13 +232,17 @@ while True:
     while Run is True:
         
         MapArray = BFRMR1OpenCV.NewMap(MapWidth,MapHeight)
+        TargetFound = False
 
+        #Scan area in front of robot looking for a QR code until code is found
         HeadTiltAngle = 0
         for y in range(-40,41,20):
             HeadPanAngle = y
             RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
             time.sleep(0.2) #small delay, let image settle
             print "Scanning image"
+            Data = BFRMR1OpenCV.FindQRBorder(YELLOWOBJECTS)
+            '''
             QRCodeData = BFRMR1OpenCV.ReadQRCode()
             if QRCodeData is 0:
                 print "No QR code found"
@@ -245,35 +251,64 @@ while True:
                 QRX = QRCodeData[1]
                 QRY = QRCodeData[2]
                 QRDistance = QRCodeData[3]
-                
+          
                 #Calculate X and Y values for map here
                 #Find X and Y coordinates of QR code in camera centred world coorinates in CM
                 XDist = QRX - 320.00
                 XCamAngle = math.atan(XDist/640.00)
                 XCamAngleDeg = math.degrees(XCamAngle)
-                XCam = math.sin(XCamAngle) * QRDistance
-                YCam = math.cos(XCamAngle) * QRDistance
-                HeadPanRad = math.radians(HeadPanAngle)
-                XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
-                YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
-
-                #Scale and translate X and Y coordinates ready to plot to map
-                XWorld = int((XWorld/MapScale) + (MapWidth/2))
-                YWorld = int(MapHeight - (YWorld/MapScale))
-                
-                print "XWorld =",XWorld, "YWorld =", YWorld
-
-                MapArray = BFRMR1OpenCV.AddToMap(MapArray,XWorld,YWorld,QRCodeData[0])
-                BFRMR1OpenCV.ShowMap(MapArray)
-
                 TotalAngle = XCamAngleDeg + HeadPanAngle
-                
+
+                #Turn to face QR Code       
                 if TotalAngle > 0:
-                    # Turn to face largest object
                     RobotData = RobotMove(ROBOTRIGHT,int(abs(TotalAngle/TurnRatio)),3, 0, 255) 
                 elif TotalAngle < 0:
                     RobotData = RobotMove(ROBOTLEFT,int(abs(TotalAngle/TurnRatio)),3, 0, 255)
-        
+                TargetFound = True
+                break
+
+        if TargetFound is True:
+            print "Centring Head"
+            RobotData = HeadMove(0, 0, 8)
+            time.sleep(1)
+            QRCodeData = BFRMR1OpenCV.ReadQRCode()
+            if QRCodeData is 0:
+                print "No QR code found"
+                RobotData = RobotMove(ROBOTFORWARD,20,3, 0, 255)
+            else:
+                QRValue = QRCodeData[0]
+                QRX = QRCodeData[1]
+                QRY = QRCodeData[2]
+                QRDistance = QRCodeData[3]
+
+            RobotData = GetData()
+            LeftIR = RobotData[0] 
+            CentreIR = RobotData[1]
+            RightIR = RobotData[2]
+            IRString = "LeftIR = " + str(LeftIR) + " CentreIR = " + str(CentreIR) + " RightIR = " + str(RightIR)
+            print(Fore.GREEN + IRString)
+
+            if LeftIR > IRThreshold or CentreIR > IRThreshold or RightIR > IRThreshold:
+                RobotData = RobotMove(ROBOTREVERSE,20,3, 0, 255)
+
+        '''           
+                
+        '''
+        XCam = math.sin(XCamAngle) * QRDistance
+        YCam = math.cos(XCamAngle) * QRDistance
+        HeadPanRad = math.radians(HeadPanAngle)
+        XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
+        YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
+
+        #Scale and translate X and Y coordinates ready to plot to map
+        XWorld = int((XWorld/MapScale) + (MapWidth/2))
+        YWorld = int(MapHeight - (YWorld/MapScale))
+                
+        print "XWorld =",XWorld, "YWorld =", YWorld
+
+        MapArray = BFRMR1OpenCV.AddToMap(MapArray,XWorld,YWorld,QRCodeData[0])
+        BFRMR1OpenCV.ShowMap(MapArray)
+        '''
 
 BFRMR1serialport.closeserial()  
 
