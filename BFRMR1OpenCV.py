@@ -2,11 +2,14 @@
 # |B|I|G| |F|A|C|E| |R|O|B|O|T|I|C|S|
 
 #import cv
+import time
 import cv2
 import numpy as np
 import sys
 import math
 import zbar
+from colorama import init,Fore
+init(autoreset=True)
 
 DisplayImage = True
 
@@ -19,19 +22,32 @@ capture.set(4,480) #600 480 960 600 288
 
 if DisplayImage is True:
     cv2.namedWindow("camera", 0)
-    cv2.namedWindow("map", 0)
-    print "Creating OpenCV windows"
+    cv2.namedWindow("transform", 0)
+    print (Fore.GREEN + "Creating OpenCV windows")
     #cv2.waitKey(50)
     cv2.resizeWindow("camera", 640,480) 
-    cv2.resizeWindow("map", 600,600) 
-    print "Resizing OpenCV windows"
+    cv2.resizeWindow("transform", 300,300) 
+    print (Fore.GREEN + "Resizing OpenCV windows")
     #cv2.waitKey(50)
     cv2.moveWindow("camera", 400,30)
-    cv2.moveWindow("map", 1100,30)
-    print "Moving OpenCV window"
+    cv2.moveWindow("transform", 1100,30)
+    print (Fore.GREEN + "Moving OpenCV window")
     cv2.waitKey(50)
 
-
+##################################################################################################
+#
+# Set up detectors for symbols
+#
+##################################################################################################
+detector = cv2.SURF(1000)
+HomeSymbol = cv2.imread("homesymbol.png")
+HomeSymbolKeypoints, HomeSymbolDescriptors = detector.detectAndCompute(HomeSymbol , None)
+FoodSymbol = cv2.imread("foodsymbol.png")
+FoodSymbolKeypoints, FoodSymbolDescriptors = detector.detectAndCompute(FoodSymbol , None)
+FLANN_INDEX_KDTREE = 0
+index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+search_params = dict(checks = 50)
+matcher = cv2. FlannBasedMatcher(index_params, search_params)
 ##################################################################################################
 #
 # Display image - Capture a frame and display it on the screen
@@ -50,157 +66,35 @@ def DisplayFrame():
 
 ##################################################################################################
 #
-# FindFirstEdge
-#
-# Captures an image, converts it to grayscale and blurs it before doing canny edge detection.
-# Resulting edge detected image is then analysed to find the first edge in the image, scanning
-# from the bottom to the top at set intervals in the x direction.
-# Returns an array of screen coordinates corresponding to the first edge found.
-##################################################################################################
-def FindFirstEdge():
-
-    StepSize = 5
-    EdgeArray = []
-
-    #camera calibration values
-    K = np.array([[640.00, 0, 320.00], [0, 613.00, 240.00], [0, 0, 1]])
-    d = np.array([0.05897, -0.4494, 0, 0, 0]) # just use first two terms (no translation)
-
-    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
-    ret,img = capture.read() 
-    ret,img = capture.read()
-    ret,img = capture.read()
-    ret,img = capture.read() #5 seems to be enough
-
-    #undistort image
-    h, w = img.shape[:2]
-    newcamera, roi = cv2.getOptimalNewCameraMatrix(K, d, (w,h), 0) 
-    #img = cv2.undistort(img, K, d, None, newcamera)
-
-    imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)   #convert img to grayscale and store result in imgGray
-    imgGray = cv2.bilateralFilter(imgGray,9,150,150) #blur the image slightly to remove noise             
-    imgEdge = cv2.Canny(imgGray, 50, 100)             #edge detection
-
-    imagewidth = imgEdge.shape[1] - 1
-    imageheight = imgEdge.shape[0] - 1
-    
-
-    for j in range (0,imagewidth,StepSize):    #for the width of image array
-        for i in range(imageheight-5,0,-1):    #step through every pixel in height of array from bottom to top
-                                               #Ignore first couple of pixels as may trigger due to undistort
-            if imgEdge.item(i,j) == 255:       #check to see if the pixel is white which indicates an edge has been found
-                EdgeArray.append((j,i))        #if it is, add x,y coordinates to ObstacleArray
-                break                          #if white pixel is found, skip rest of pixels in column
-        else:                                  #no white pixel found
-            EdgeArray.append((j,0))            #if nothing found, assume no obstacle. Set pixel position way off the screen to indicate
-                                               #no obstacle detected
-            
-    
-    for x in range (len(EdgeArray)-1):      #draw lines between points in ObstacleArray 
-        cv2.line(img, EdgeArray[x], EdgeArray[x+1],(0,255,0),1) 
-    for x in range (len(EdgeArray)):        #draw lines from bottom of the screen to points in ObstacleArray
-        cv2.line(img, (x*StepSize,imageheight), EdgeArray[x],(0,255,0),1)
-
-    if DisplayImage is True:
-        cv2.imshow("camera", img)
-        cv2.waitKey(10)
-
-    return EdgeArray
-
-##################################################################################################
-#
-# ReadQRCode
-# Scans the image for a QR code and then reads it. Also uses focal length of the camera and the 
-# known width of the QR code to calculate the approximate distance to the QR code from the camera.
+# Reform Contours - Takes an approximated array of 4 pairs of coordinates and puts them in the order
+# TOP-LEFT, TOP-RIGHT, BOTTOM-RIGHT, BOTTOM-LEFT
 #
 ##################################################################################################
-def ReadQRCode():
-
-    Data = 0
-    Location = 0
-    ReturnData = 0
-
-    ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
-    ret,img = capture.read() 
-    ret,img = capture.read()
-    ret,img = capture.read()
-    ret,img = capture.read() #5 seems to be enough
-
-    imggray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)   #convert img to grayscale and store result in imgGray
-    height, width = imggray.shape[:2] #get height and width of img
+def ReformContours(contours):
+        contours = contours.reshape((4,2))
+        contoursnew = np.zeros((4,2),dtype = np.float32)
  
-    # wrap image data
-    image = zbar.Image(width, height, 'Y800', imggray.tostring())
-    scanner = zbar.ImageScanner()
-    scanner.parse_config('enable')
-    # scan the image for barcodes
-    scanner.scan(image)
-
-    for symbol in image:
-        Data = symbol.data
-        Location = symbol.location 
+        add = contours.sum(1)
+        contoursnew[0] = contours[np.argmin(add)]
+        contoursnew[2] = contours[np.argmax(add)]
+         
+        diff = np.diff(contours,axis = 1)
+        contoursnew[1] = contours[np.argmin(diff)]
+        contoursnew[3] = contours[np.argmax(diff)]
   
-    if Data is 0: #No QR Code found
-        ReturnData = 0
-        
-    else:
-        print "Found", Data
-        #Find centre point of QR Code
-        CentreY = Location[0][1] + ((Location[1][1]-Location[0][1])/2)
-        CentreX = Location[0][0] + ((Location[3][0]-Location[0][0])/2)
-        #Find lengths of the 4 sides of the QR code
-        QRWidths = []
-        QRWidths.append(Location[1][1] - Location[0][1])
-        QRWidths.append(Location[2][0] - Location[1][0])
-        QRWidths.append(Location[2][1] - Location[3][1])
-        QRWidths.append(Location[3][0] - Location[0][0])
-        #Find the longest side of the QR Code
-        LongestSide = 0
-        for x in range (len(QRWidths)):
-            if QRWidths[x] > LongestSide:
-                LongestSide = QRWidths[x]
-            
-        QRSize = LongestSide
-        print "QRsize", QRSize
-        #Work out distance from camera to QR Code in CM
-        QRDistance = (640.00*10.6)/QRSize #focal length x QRCode width / size of QRCode
-        print "Distance to QR Code", QRDistance,"cm"
-
-        
-
-    ############################################################################################
-    #
-    # Draw box around QR code and write distance to screen 
-
-        for x in range (len(Location)-1):
-            cv2.line(img,Location[x],Location[x+1], (0,0,255),1)
-        cv2.line(img,Location[0],Location[3], (0,0,255),1)
-        #Draw Circle at centre point
-        cv2.circle(img, (CentreX, CentreY), 3, (0,255,0),-1) #draw a circle at centre point of object
-        #Write distance to QR code to the screen
-        TextForScreen = str(symbol.data) + " at " + "%.2f" % QRDistance + "cm"
-        cv2.putText(img,TextForScreen, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0),2)
-
-        ReturnData = [Data,CentreX,CentreY,QRDistance]
-        
-
-    if DisplayImage is True:
-        cv2.imshow("camera", img)
-        cv2.waitKey(10)
-
-    return ReturnData
-    
+        return contoursnew
 
 ##################################################################################################
 #
-# FindQRBorder
+# FindSymbol
 #
 ##################################################################################################
 
-def FindQRBorder(ThresholdArray):
+def FindSymbol(ThresholdArray):
 
-    boxcentre = 0
-    
+    TargetData = 0
+    SymbolFound = -1
+    time.sleep(0.25)#let image settle
     ret,img = capture.read() #get a bunch of frames to make sure current frame is the most recent
     ret,img = capture.read() 
     ret,img = capture.read()
@@ -212,83 +106,97 @@ def FindQRBorder(ThresholdArray):
     upper = np.array([ThresholdArray[3], ThresholdArray[4], ThresholdArray[5]])
 
     imgthreshed = cv2.inRange(imgHSV, lower, upper) #threshold imgHSV
-    imgthreshed = cv2.blur(imgthreshed,(3,3))
 
-    contours, hierarchy = cv2.findContours(imgthreshed,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(imgthreshed,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)  
     
     for x in range (len(contours)):
-        
-        contourarea = cv2.contourArea(contours[x])
-        if contourarea > 200:
+        contourarea = cv2.contourArea(contours[x]) #get area of contour
+        if contourarea > 500: #Discard contours with a small area as this may just be noise
+            arclength = cv2.arcLength(contours[x], True)
+            approxcontour = cv2.approxPolyDP(contours[x], 0.08 * arclength, True) #Approximate contour to find square objects
+            if len(approxcontour) == 4: #if approximated contour has 4 corner points
+                if hierarchy[0][x][2] != -1: #if contour has a child contour, which is QR code in centre of border
+                    #find centre point of target
+                    rect = cv2.minAreaRect(contours[x])
+                    box = cv2.cv.BoxPoints(rect)
+                    box = np.int0(box)
+                    boxcentrex = int(rect[0][0])
+                    boxcentrey = int(rect[0][1])
+                    
+                    #Find approximate distance to target
+                    W = rect[1][0]
+                    H = rect[1][1]
+                    if W > H:
+                        LongestSide = W
+                    else:
+                        LongestSide = H
+                    Distance = (640.00*14)/LongestSide #focal length x Actual Border width / size of Border in pixels
 
-            rect = cv2.minAreaRect(contours[x])
-            box = cv2.cv.BoxPoints(rect)
-            box = np.int0(box)
-            cv2.drawContours(img,[box],0,(0,255,0),1)
+                    #correct perspective of found target and output to image named warp      
+                    reformedcontour = ReformContours(approxcontour) #make sure coordinates are in the correct order
+                    dst = np.array([[0,0],[300,0],[300,300],[0,300]],np.float32)
+                    ret = cv2.getPerspectiveTransform(reformedcontour,dst)
+                    warp = cv2.warpPerspective(img,ret,(300,300))
+                    cv2.imshow("transform", warp)
+                    cv2.waitKey(10)
+                    
 
-            boxcentre = rect[0] #get centre coordinates of each object
-            boxcentrex = int(boxcentre[0])
-            boxcentrey = int(boxcentre[1])
-            cv2.circle(img, (boxcentrex, boxcentrey), 5, (0,255,0),-1) #draw a circle at centre point of object
-      
+                    #draw box around target and a circle to mark the centre point
+                    cv2.drawContours(img,[approxcontour],0,(0,0,255),2)
+                    cv2.circle(img, (boxcentrex, boxcentrey), 5, (0,0,255),-1) #draw a circle at centre point of object
+                    TextForScreen = "Approx. Distance: " + "%.2f" % Distance + "cm"
+                    cv2.putText(img,TextForScreen, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0,255,0),1)
 
+
+                    Keypoints, Descriptors = detector.detectAndCompute(warp, None)
+                    if Descriptors is None:
+                        print "Error - No descriptors found in image"
+                    else:
+                        matches = matcher.knnMatch(HomeSymbolDescriptors, Descriptors, 2)
+                        GoodMatches = []
+                        for match in matches:
+                            if match[0].distance < match[1].distance * 0.7:
+                                GoodMatches.append(match)
+                        if len(GoodMatches) >= 4:
+                            SymbolFound = "HOME"
+
+                        if SymbolFound == -1: #No symbol found yet
+                            matches = matcher.knnMatch(FoodSymbolDescriptors, Descriptors, 2)
+                            GoodMatches = []
+                            for match in matches:
+                                if match[0].distance < match[1].distance * 0.7:
+                                    GoodMatches.append(match)
+                            if len(GoodMatches) >= 4:
+                                SymbolFound = "FOOD"
+
+                        print (Fore.GREEN + "Symbol Found -" + str(SymbolFound))
+                        #write symbol type to screen
+                        TextForScreen = "Found: " + str(SymbolFound)
+                        cv2.putText(img,TextForScreen, (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0,255,0),1)
+
+                    #Try to find approximate angle to target
+                    leftedge = reformedcontour[3][1] - reformedcontour[0][1]
+                    rightedge = reformedcontour[2][1] - reformedcontour[1][1]
+                    print (Fore.GREEN + "Left Edge:" + str(leftedge))
+                    print (Fore.GREEN + "Right Edge:" + str(rightedge))
+                    EdgeDifference = leftedge - rightedge
+                    print (Fore.GREEN + "Edge Difference:" + str(EdgeDifference))
+                    if EdgeDifference > 0:
+                        print (Fore.GREEN + "Symbol is to the robots left")
+                    elif EdgeDifference == 0:
+                        print (Fore.GREEN + "Symbol is dead ahead")
+                    else:
+                        print (Fore.GREEN + "Symbol is to the robots right")
+                    #time.sleep(1)
+                    
+                    TargetData = [boxcentrex, boxcentrey, Distance, SymbolFound, EdgeDifference] 
+                    break
+          
     if DisplayImage is True:
         cv2.imshow("camera", img)
         cv2.waitKey(10)
 
-    return boxcentre
-
-
-##################################################################################################
-#
-# FindWorldCoords
-#
-# Converts all points in EdgeArray from screen coordinates to world coordinates and returns the
-# results as an array of x and y coordinates. Needs head pan and tilt angles.
-#
-##################################################################################################
-def FindWorldCoords(EdgeArray,HeadPanAngle,HeadTiltAngle,Scale):
-
-    WorldArray = []
-
-    for x in range(len(EdgeArray)): #For each point in edge array
-        Point = EdgeArray[x]
-        XScreen = Point[0]
-        XDist = XScreen - 330.00
-        XCamAngle = math.atan(XDist/612.00)
-        XCamAngleDeg = math.degrees(XCamAngle )
-
-        YScreen = Point[1]
-        YDist = 254.00 - YScreen
-        YCamAngle = math.atan(YDist/613.00)
-        YCamAngleDeg = math.degrees(YCamAngle)
-
-        YAngleTotal = HeadTiltAngle + YCamAngleDeg
-
-        if YAngleTotal >= 0:
-            YAngleTotal = -1
-        #if YAngleTotal < 0 and YScreen > 0: #YAngle must be less than zero otherwise distance to object on the ground cannot be found
-
-        YAngleTotalRad = math.radians(90+YAngleTotal)
-        YCam = math.tan(YAngleTotalRad) * 23.5
-        YCam = YCam/math.cos(math.radians(XCamAngle))
-        XCam = math.tan(XCamAngle) * YCam
-            #Rotate points around z axis by HeadPanAngle degrees
-        HeadPanRad = math.radians(HeadPanAngle)
-        XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
-        YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
-
-        XWorld = XWorld/Scale
-        YWorld = YWorld/Scale
-
-        WorldArray.append((int(XWorld),int(YWorld)))
-            
-    
-    return WorldArray
-
-
-
-
+    return TargetData
 
 ##################################################################################################
 #

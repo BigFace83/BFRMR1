@@ -30,13 +30,12 @@ GPIO.setup(17, GPIO.IN)
 GPIO.setup(27, GPIO.IN)
 GPIO.setup(22, GPIO.IN)
 
-TurnRatio = 3.4
+TurnRatio = 4
 Run = True
 
 MapWidth = 200
 MapHeight = 200
 MapScale = 2 #Map is divided by scale value. The higher the value, the smaller the map
-
 
 # Data Packet from robot
 #
@@ -56,9 +55,10 @@ MapScale = 2 #Map is divided by scale value. The higher the value, the smaller t
 #
 ########################################################################################
 
-YELLOWOBJECTS = [15,130,110,30,255,255]
-BLUEOBJECTS = [40,120,120,160,255,255]
+YELLOWOBJECTS = [10,100,90,30,255,255]
+BLUEOBJECTS = [100,145,130,130,255,255]
 ORANGEOBJECTS = [5,170,170,15,255,255]
+GREENOBJECTS = [40,60,60,95,200,200]
 
 ########################################################################################
 #
@@ -176,6 +176,44 @@ def MoveReverse():
 
 ########################################################################################
 #
+# LookAtTarget - Turns head to centre target on the camera. X and Y arguements are camera
+# coordinates of target
+# Returns new head servo angles
+#
+########################################################################################
+def LookAtTarget(X, Y, HeadPanAngle, HeadTiltAngle):
+
+    print "Looking at Target"
+    HeadAngles = []
+    PlayTone(0)
+    XDist = X - 320.00
+    XCamAngle = math.atan(XDist/640.00)
+    YDist = 240.00 - Y
+    YCamAngle = math.atan(YDist/640.00)
+    HeadTiltAngle = HeadTiltAngle + math.degrees(YCamAngle)
+    HeadPanAngle = HeadPanAngle + math.degrees(XCamAngle)
+    RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 5)
+ 
+    HeadAngles.append(HeadPanAngle)
+    HeadAngles.append(HeadTiltAngle)
+    return HeadAngles
+    
+########################################################################################
+#
+# TurnToTarget - Turns robot to face object. Arguement passed to function is head pan angle
+#
+########################################################################################
+def TurnToTarget(TurnAngle, Speed):
+       
+    print "Turning to face Target"
+    if TurnAngle > 0:
+        RobotData = RobotMove(ROBOTRIGHT,int(abs(TurnAngle/TurnRatio)),Speed, 0, 255) 
+    elif TurnAngle < 0:
+        RobotData = RobotMove(ROBOTLEFT,int(abs(TurnAngle/TurnRatio)),Speed, 0, 255)
+    
+
+########################################################################################
+#
 # Button 0 Interrupt Routine
 #
 ########################################################################################
@@ -212,6 +250,70 @@ def Button3Pressed(channel):
 
 ########################################################################################
 #
+# Scan for target - Scan area in front of robot looking for a target. If target is found
+# turn to face it and check that it is still there and directly in front of robot.
+# If target is found, return type, distance and angle. 
+# TargetData = [boxcentrex, boxcentrey, Distance, SymbolFound, EdgeDifference] 
+#
+########################################################################################
+def ScanForTarget():
+
+    print "Scanning for target"
+    returndata = -1
+    #Scan area in front of robot looking for an image target
+    HeadTiltAngle = 0
+    for y in range(-40,41,10):
+        HeadTiltAngle = 0
+        HeadPanAngle = y
+        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
+        print "Scanning image"
+        TargetData = BFRMR1OpenCV.FindSymbol(GREENOBJECTS)
+        if TargetData == 0:
+            print "No Target in image"
+        else:
+            HeadAngles = LookAtTarget(TargetData[0], TargetData[1], HeadPanAngle, HeadTiltAngle) #turn head to face target
+            HeadPanAngle = HeadAngles[0] # get new head angles
+            HeadTiltAngle = HeadAngles[1]
+            for x in range (0,3): #check 3 times to see if target is still in front of robot
+                TargetData = BFRMR1OpenCV.FindSymbol(GREENOBJECTS)           
+                if TargetData != 0: #if target is still present
+                    TurnToTarget(HeadPanAngle, 3) #Turn to face target
+                    HeadPanAngle = 0
+                    RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8) #centre head pan angle
+
+                    #Robot is now facing target, check again that it is still there and dead ahead.
+                    #If not, correct heading and check again, up to 3 times
+                    for x in range (0,3):
+                        TargetData = BFRMR1OpenCV.FindSymbol(GREENOBJECTS)           
+                        if TargetData != 0: #target found
+                            HeadAngles = LookAtTarget(TargetData[0], TargetData[1], HeadPanAngle, HeadTiltAngle)
+                            HeadPanAngle = HeadAngles[0]
+                            HeadTiltAngle = HeadAngles[1]
+                            if abs(HeadPanAngle) < 4: #When robot is looking at target, if head angle is less than 4 degrees either way
+                                                      #then target is dead ahead
+                                print "Target dead ahead"
+                                print "Distance from OpenCV =", TargetData[2]
+                                print "Sonar Distance =", RobotData[5]
+                                returndata = [TargetData[3], TargetData[2], TargetData[4]]
+                                return(returndata)
+                            else: 
+                                print "Target NOT ahead" 
+                                TurnToTarget(HeadPanAngle, 3) #Turn to face target
+               
+                else:
+                    Target = 0
+                    print "Target Lost"
+                    
+
+            
+                 
+
+    return(returndata)
+
+
+
+########################################################################################
+#
 # Main
 #
 ########################################################################################
@@ -221,94 +323,13 @@ GPIO.add_event_detect(17, GPIO.FALLING, callback=Button1Pressed, bouncetime=200)
 GPIO.add_event_detect(27, GPIO.FALLING, callback=Button2Pressed, bouncetime=200)
 GPIO.add_event_detect(22, GPIO.FALLING, callback=Button3Pressed, bouncetime=200)
 
-while True:
-
-########################################################################################
-#
-# 
-#
-########################################################################################
-
-    while Run is True:
+TargetData = ScanForTarget()
+if TargetData == -1:
+    print "No Target found from scan"
+else:
+    print "Target Aquired"
         
-        MapArray = BFRMR1OpenCV.NewMap(MapWidth,MapHeight)
-        TargetFound = False
-
-        #Scan area in front of robot looking for a QR code until code is found
-        HeadTiltAngle = 0
-        for y in range(-40,41,20):
-            HeadPanAngle = y
-            RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
-            time.sleep(0.2) #small delay, let image settle
-            print "Scanning image"
-            Data = BFRMR1OpenCV.FindQRBorder(YELLOWOBJECTS)
-            '''
-            QRCodeData = BFRMR1OpenCV.ReadQRCode()
-            if QRCodeData is 0:
-                print "No QR code found"
-            else:
-                QRValue = QRCodeData[0]
-                QRX = QRCodeData[1]
-                QRY = QRCodeData[2]
-                QRDistance = QRCodeData[3]
-          
-                #Calculate X and Y values for map here
-                #Find X and Y coordinates of QR code in camera centred world coorinates in CM
-                XDist = QRX - 320.00
-                XCamAngle = math.atan(XDist/640.00)
-                XCamAngleDeg = math.degrees(XCamAngle)
-                TotalAngle = XCamAngleDeg + HeadPanAngle
-
-                #Turn to face QR Code       
-                if TotalAngle > 0:
-                    RobotData = RobotMove(ROBOTRIGHT,int(abs(TotalAngle/TurnRatio)),3, 0, 255) 
-                elif TotalAngle < 0:
-                    RobotData = RobotMove(ROBOTLEFT,int(abs(TotalAngle/TurnRatio)),3, 0, 255)
-                TargetFound = True
-                break
-
-        if TargetFound is True:
-            print "Centring Head"
-            RobotData = HeadMove(0, 0, 8)
-            time.sleep(1)
-            QRCodeData = BFRMR1OpenCV.ReadQRCode()
-            if QRCodeData is 0:
-                print "No QR code found"
-                RobotData = RobotMove(ROBOTFORWARD,20,3, 0, 255)
-            else:
-                QRValue = QRCodeData[0]
-                QRX = QRCodeData[1]
-                QRY = QRCodeData[2]
-                QRDistance = QRCodeData[3]
-
-            RobotData = GetData()
-            LeftIR = RobotData[0] 
-            CentreIR = RobotData[1]
-            RightIR = RobotData[2]
-            IRString = "LeftIR = " + str(LeftIR) + " CentreIR = " + str(CentreIR) + " RightIR = " + str(RightIR)
-            print(Fore.GREEN + IRString)
-
-            if LeftIR > IRThreshold or CentreIR > IRThreshold or RightIR > IRThreshold:
-                RobotData = RobotMove(ROBOTREVERSE,20,3, 0, 255)
-
-        '''           
-                
-        '''
-        XCam = math.sin(XCamAngle) * QRDistance
-        YCam = math.cos(XCamAngle) * QRDistance
-        HeadPanRad = math.radians(HeadPanAngle)
-        XWorld = XCam*math.cos(-HeadPanRad) - YCam*math.sin(-HeadPanRad)
-        YWorld = XCam*math.sin(-HeadPanRad) + YCam*math.cos(-HeadPanRad)
-
-        #Scale and translate X and Y coordinates ready to plot to map
-        XWorld = int((XWorld/MapScale) + (MapWidth/2))
-        YWorld = int(MapHeight - (YWorld/MapScale))
-                
-        print "XWorld =",XWorld, "YWorld =", YWorld
-
-        MapArray = BFRMR1OpenCV.AddToMap(MapArray,XWorld,YWorld,QRCodeData[0])
-        BFRMR1OpenCV.ShowMap(MapArray)
-        '''
+        
 
 BFRMR1serialport.closeserial()  
 

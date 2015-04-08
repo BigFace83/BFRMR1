@@ -244,7 +244,7 @@ void movehead(unsigned char headpanposition, unsigned char headtiltposition, uns
 void moverobot(unsigned char robotdirection,unsigned char encodercount, unsigned char wheelspeed, unsigned char sonarthreshold, unsigned char irthreshold)
 {
   
-  movehead(128,128,6); //centre head before moving
+  //movehead(128,128,6); //centre head before moving
   readsensors(); // Get latest readings before setting off. If this isn't done, robot may stop first time through the loop if
                  // last readings were below thresholds
   int pgain = 4;
@@ -383,7 +383,7 @@ void readsensors() //Read all of the sensors and form data into a packet ready t
   unsigned char headpanservo = analogRead(5)/4;
   unsigned char headtiltservo = analogRead(6)/4;
   
-  //read head sonar sensor 
+  //read head sonar sensor
   pinMode(38, OUTPUT);
   digitalWrite(38, LOW);             // Make sure pin is low before sending a short high to trigger ranging
   delayMicroseconds(2);
@@ -392,7 +392,7 @@ void readsensors() //Read all of the sensors and form data into a packet ready t
   digitalWrite(38, LOW);             // Send pin low again before waiting for pulse back in
   pinMode(38, INPUT);
   int duration = pulseIn(38, HIGH);  // Reads echo pulse in from SRF05 in micro seconds
-  int headsensor = duration/58;      // Dividing this by 58 gives us a distance in cm
+  int headsensor = (duration/58);      // Dividing this by 58 gives us a distance in cm
   if(headsensor > 255)
   {
     headsensor = 255;
@@ -432,7 +432,7 @@ void playtone0()
     for(int i=100; i<600; i=i+10)
     {
        tone(12, i, 10);
-       delay(10);
+       delay(5);
        
     }
     // stop the tone playing:
