@@ -52,7 +52,7 @@ RAMWR = 0x2C #RAM write
 MADCTL = 0x36 #axis control
 COLMOD = 0x3A #color mode
 
-bColor = LIGHTBLUE
+bColor = BLACK
 
 ########################################################################
 #

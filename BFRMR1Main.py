@@ -10,7 +10,7 @@
 # Author : Peter Neal
 #
 # Date : 30 July 2014
-# Last Update : 14 March 2015
+# Last Update : 15 April 2015
 #
 ########################################################################################
 
@@ -31,7 +31,7 @@ GPIO.setup(27, GPIO.IN)
 GPIO.setup(22, GPIO.IN)
 
 TurnRatio = 4
-Run = True
+Run = False
 
 MapWidth = 200
 MapHeight = 200
@@ -58,7 +58,7 @@ MapScale = 2 #Map is divided by scale value. The higher the value, the smaller t
 YELLOWOBJECTS = [10,100,90,30,255,255]
 BLUEOBJECTS = [100,145,130,130,255,255]
 ORANGEOBJECTS = [5,170,170,15,255,255]
-GREENOBJECTS = [40,60,60,95,200,200]
+GREENOBJECTS = [40,60,60,100,200,230]
 
 ########################################################################################
 #
@@ -193,7 +193,6 @@ def LookAtTarget(X, Y, HeadPanAngle, HeadTiltAngle):
     HeadTiltAngle = HeadTiltAngle + math.degrees(YCamAngle)
     HeadPanAngle = HeadPanAngle + math.degrees(XCamAngle)
     RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 5)
- 
     HeadAngles.append(HeadPanAngle)
     HeadAngles.append(HeadTiltAngle)
     return HeadAngles
@@ -211,7 +210,6 @@ def TurnToTarget(TurnAngle, Speed):
     elif TurnAngle < 0:
         RobotData = RobotMove(ROBOTLEFT,int(abs(TurnAngle/TurnRatio)),Speed, 0, 255)
     
-
 ########################################################################################
 #
 # Button 0 Interrupt Routine
@@ -219,7 +217,10 @@ def TurnToTarget(TurnAngle, Speed):
 ########################################################################################
 
 def Button0Pressed(channel):  
+    global Run
     print "Button 0 pressed"
+    Run = True
+    
     
 ########################################################################################
 #
@@ -253,62 +254,151 @@ def Button3Pressed(channel):
 # Scan for target - Scan area in front of robot looking for a target. If target is found
 # turn to face it and check that it is still there and directly in front of robot.
 # If target is found, return type, distance and angle. 
-# TargetData = [boxcentrex, boxcentrey, Distance, SymbolFound, EdgeDifference] 
-#
+# TargetData = [boxcentrex, boxcentrey, Distance, SymbolFound, SymbolLocation, whratio] 
+# returndata = [SymbolFound, Distance, SymbolLocation, whratio]
 ########################################################################################
-def ScanForTarget():
+def ScanForTarget(Symbol):
 
-    print "Scanning for target"
+    print (Fore.BLUE + "Scanning for target")
     returndata = -1
     #Scan area in front of robot looking for an image target
     HeadTiltAngle = 0
-    for y in range(-40,41,10):
+    for y in range(-60,61,20):
         HeadTiltAngle = 0
         HeadPanAngle = y
-        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
-        print "Scanning image"
-        TargetData = BFRMR1OpenCV.FindSymbol(GREENOBJECTS)
-        if TargetData == 0:
-            print "No Target in image"
-        else:
+        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)#Move head to next position
+        TargetData = CheckForTarget(Symbol,1)#Capture image and check for symbol
+        if TargetData == -1:
+            print (Fore.BLUE + "No Target In Image")
+        else: #If the correct symbol has been found
             HeadAngles = LookAtTarget(TargetData[0], TargetData[1], HeadPanAngle, HeadTiltAngle) #turn head to face target
             HeadPanAngle = HeadAngles[0] # get new head angles
             HeadTiltAngle = HeadAngles[1]
-            for x in range (0,3): #check 3 times to see if target is still in front of robot
-                TargetData = BFRMR1OpenCV.FindSymbol(GREENOBJECTS)           
-                if TargetData != 0: #if target is still present
-                    TurnToTarget(HeadPanAngle, 3) #Turn to face target
-                    HeadPanAngle = 0
-                    RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8) #centre head pan angle
-
-                    #Robot is now facing target, check again that it is still there and dead ahead.
-                    #If not, correct heading and check again, up to 3 times
-                    for x in range (0,3):
-                        TargetData = BFRMR1OpenCV.FindSymbol(GREENOBJECTS)           
-                        if TargetData != 0: #target found
-                            HeadAngles = LookAtTarget(TargetData[0], TargetData[1], HeadPanAngle, HeadTiltAngle)
-                            HeadPanAngle = HeadAngles[0]
-                            HeadTiltAngle = HeadAngles[1]
-                            if abs(HeadPanAngle) < 4: #When robot is looking at target, if head angle is less than 4 degrees either way
-                                                      #then target is dead ahead
-                                print "Target dead ahead"
-                                print "Distance from OpenCV =", TargetData[2]
-                                print "Sonar Distance =", RobotData[5]
-                                returndata = [TargetData[3], TargetData[2], TargetData[4]]
-                                return(returndata)
-                            else: 
-                                print "Target NOT ahead" 
-                                TurnToTarget(HeadPanAngle, 3) #Turn to face target
-               
-                else:
-                    Target = 0
-                    print "Target Lost"
-                    
-
-            
+            TargetData = CheckForTarget(Symbol,3) #Check 3 times to see if target is still there
+            if TargetData == -1:
+                print (Fore.BLUE + "Target Lost")
+            else: #Robot is looking at target, check again that target is still there
+                TurnToTarget(HeadPanAngle, 3) #Turn robot to face target
+                HeadPanAngle = 0
+                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8) #centre head pan angle
+                #Robot is now facing target. Keep checking for target and turn robot until target is dead ahead
+                Aligned = AlignToTarget(Symbol)
+                if Aligned == 1:
+                    return 1
                  
-
+  
+    #If no targets have been found, or target has been lost, return -1
     return(returndata)
+
+########################################################################################
+#
+# Scan ground - Scan area of floor front of robot looking for obstacles.
+#
+########################################################################################
+def ScanGround():
+
+    print "Scanning ground"
+    returndata = -1
+    #Scan area in front of robot looking for an image target
+    HeadPanAngle = 0
+    for y in range(-40,1,20):
+        HeadPanAngle = 0
+        HeadTiltAngle = y
+        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
+        BFRMR1OpenCV.CheckGround()
+        RobotData = GetData()
+        print "LeftIR -", RobotData[0]
+        print "CentreIR -", RobotData[1]
+        print "RightIR -", RobotData[2]
+
+########################################################################################
+#
+# Align To Target - Turns robot to face target
+#
+########################################################################################
+def AlignToTarget(Symbol):
+    HeadPanAngle = 0
+    HeadTiltAngle = 0
+    while True:
+        TargetData = CheckForTarget(Symbol,3) #Check 3 times to see if target is still there
+        if TargetData == -1: #If target has gone, exit loop
+            print (Fore.BLUE + "Target Lost")
+            return -1
+        else: #If target is still there, turn head to face target
+            HeadAngles = LookAtTarget(TargetData[0], TargetData[1], HeadPanAngle, HeadTiltAngle)
+            HeadPanAngle = HeadAngles[0]
+            HeadTiltAngle = HeadAngles[1]
+            if abs(HeadPanAngle) < 4: #When robot is looking at target, if head angle is less than 4 degrees either way
+                                      #then target is dead ahead
+                return 1 #if target has been found and robot is now facing target, return 1
+            else: 
+                print (Fore.BLUE + "Target NOT ahead - Adjusting Heading")
+                TurnToTarget(HeadPanAngle, 3) #Turn to face target
+
+########################################################################################
+#
+# Check For Target - Checks image for a given symbol. Tries (tries) times and returns -1 for
+# no target present and 1 for target found
+#
+########################################################################################
+def CheckForTarget(Symbol ,tries):
+
+    for x in range (0,tries):
+        TargetData = BFRMR1OpenCV.FindSymbol(GREENOBJECTS)
+        if TargetData != -1:#Target present          
+            if TargetData[3] == Symbol: #if its the correct target type
+                return TargetData #return straight away if correct symbol found
+
+    return -1
+
+########################################################################################
+#
+# Move To Target - Takes a symbol type as an arguement and moves the robot towards the
+# target. Robot should be aligned to target before calling this function.
+# TargetData = [boxcentrex, boxcentrey, Distance, SymbolFound, SymbolLocation, whratio] 
+########################################################################################
+def MoveToTarget(Symbol):
+    print "Moving to Target"
+    while True:
+        HeadPanAngle = 0
+        HeadTiltAngle = 0
+        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8) #Centre head
+        TargetData = CheckForTarget(Symbol,3)#Capture image and check for symbol
+        if TargetData == -1:
+            print (Fore.BLUE + "No Target In Image")
+            return -1 #if no target is found, return -1 immediately
+        else: #Target is there as expected
+            print (Fore.BLUE + "Target found in MoveToTarget")
+            if TargetData[2] < 100:
+                print "Target within 100cm"
+                if TargetData[5] > 0.97 and TargetData[5] < 1.03: #Target ahead
+                    print "Target Reached!!"
+                    RobotData = RobotMove(ROBOTFORWARD, 30, AutoSpeed, 10, 80)
+                    RobotData = RobotMove(ROBOTRIGHT, 200/TurnRatio, 8, 0, 255)
+                    return 1
+                else:
+                    if TargetData[4] == "LEFT":
+                        RobotData = RobotMove(ROBOTRIGHT, 10, AutoSpeed, 0, 255)
+                        RobotData = RobotMove(ROBOTFORWARD, 30, AutoSpeed, 40, 80)
+                        RobotData = RobotMove(ROBOTLEFT, 10, AutoSpeed, 0, 255)
+                        Result = AlignToTarget(Symbol)
+                    else:
+                        RobotData = RobotMove(ROBOTLEFT, 10, AutoSpeed, 0, 255)
+                        RobotData = RobotMove(ROBOTFORWARD, 30, AutoSpeed, 20, 80)
+                        RobotData = RobotMove(ROBOTRIGHT, 10, AutoSpeed, 0, 255)
+                        Result = AlignToTarget(Symbol)
+                    
+            else:
+                print "Target further than 100cm"
+                Result = AlignToTarget(Symbol)
+                if Result ==1:
+                    print "Moving Forward"
+                    RobotData = RobotMove(ROBOTFORWARD, 100, AutoSpeed, 10, 100) #
+                    if RobotData[6] < 100 and RobotData[7] < 100:
+                        print "Obstacle encountered"
+                        return -1
+                    
+        
 
 
 
@@ -323,13 +413,38 @@ GPIO.add_event_detect(17, GPIO.FALLING, callback=Button1Pressed, bouncetime=200)
 GPIO.add_event_detect(27, GPIO.FALLING, callback=Button2Pressed, bouncetime=200)
 GPIO.add_event_detect(22, GPIO.FALLING, callback=Button3Pressed, bouncetime=200)
 
-TargetData = ScanForTarget()
-if TargetData == -1:
-    print "No Target found from scan"
-else:
-    print "Target Aquired"
+
+print "Press button 0 to start"
+while True:
+
+    while Run is True:
+        TargetAquired = False
+        for x in range (0,3):
+            Result = ScanForTarget("HOME")
+            if Result == -1:
+                print "No Target found from scan"
+                #turn 120 degrees to the left
+                RobotData = RobotMove(ROBOTLEFT,int(120/TurnRatio),3, 0, 255) #no sonar or IR threshold so move always completes
+            else:
+                print "Target Aquired"
+                TargetAquired = True
+                break
         
-        
+        if TargetAquired is True:
+            result = MoveToTarget("HOME")
+            if result == 1:
+                Run = False
+                print "Press button 0 to start"
+        else:
+            print "No target in view"
+            #Move to a different location and scan again here
+            Run = True
+            print "Press button 0 to start"
+
+"""
+while True:
+    ScanGround()
+"""
 
 BFRMR1serialport.closeserial()  
 
