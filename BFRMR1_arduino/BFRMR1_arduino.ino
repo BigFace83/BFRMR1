@@ -408,7 +408,7 @@ void readsensors() //Read all of the sensors and form data into a packet ready t
   datapacket[6] = leftencodertotal;  //send encoder totals, but reset to zero following send
   datapacket[7] = rightencodertotal; //encoder count sent to pc is total since last send
                  
-  
+  delay(10);
   
   return;
   

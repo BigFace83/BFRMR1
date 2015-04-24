@@ -192,7 +192,7 @@ def LookAtTarget(X, Y, HeadPanAngle, HeadTiltAngle):
     YCamAngle = math.atan(YDist/640.00)
     HeadTiltAngle = HeadTiltAngle + math.degrees(YCamAngle)
     HeadPanAngle = HeadPanAngle + math.degrees(XCamAngle)
-    RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 5)
+    RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)
     HeadAngles.append(HeadPanAngle)
     HeadAngles.append(HeadTiltAngle)
     return HeadAngles
@@ -266,7 +266,7 @@ def ScanForTarget(Symbol):
     for y in range(-60,61,20):
         HeadTiltAngle = 0
         HeadPanAngle = y
-        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8)#Move head to next position
+        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)#Move head to next position
         TargetData = CheckForTarget(Symbol,1)#Capture image and check for symbol
         if TargetData == -1:
             print (Fore.BLUE + "No Target In Image")
@@ -280,7 +280,7 @@ def ScanForTarget(Symbol):
             else: #Robot is looking at target, check again that target is still there
                 TurnToTarget(HeadPanAngle, 3) #Turn robot to face target
                 HeadPanAngle = 0
-                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 8) #centre head pan angle
+                RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10) #centre head pan angle
                 #Robot is now facing target. Keep checking for target and turn robot until target is dead ahead
                 Aligned = AlignToTarget(Symbol)
                 if Aligned == 1:
@@ -371,20 +371,35 @@ def MoveToTarget(Symbol):
             print (Fore.BLUE + "Target found in MoveToTarget")
             if TargetData[2] < 100:
                 print "Target within 100cm"
-                if TargetData[5] > 0.97 and TargetData[5] < 1.03: #Target ahead
+                if TargetData[2] < 25: #if target is too close
+                    print (Fore.BLUE + "Target too close - Reversing")
+                    RobotData = RobotMove(ROBOTREVERSE, 30, AutoSpeed, 0, 255)#back up a bit
+                if TargetData[5] > 0.98 and TargetData[5] < 1.02: #Target ahead
                     print "Target Reached!!"
-                    RobotData = RobotMove(ROBOTFORWARD, 30, AutoSpeed, 10, 80)
-                    RobotData = RobotMove(ROBOTRIGHT, 200/TurnRatio, 8, 0, 255)
+                    attarget = False
+                    while attarget == False:
+                        RobotData = GetData()
+                        if RobotData[5] > 20:
+                            RobotData = RobotMove(ROBOTFORWARD, 200, AutoSpeed, 20, 255)
+                            print (Fore.BLUE + "Sonar in MoveToTarget - " + str(RobotData[5]))
+                            print "LeftIR -", RobotData[0]
+                            print "CentreIR -", RobotData[1]
+                            print "RightIR -", RobotData[2]
+                        else:
+                            attarget = True
+            
+                    RobotData = RobotMove(ROBOTRIGHT, 200/TurnRatio, AutoSpeed, 0, 255)
+                    RobotData = RobotMove(ROBOTREVERSE, 30, AutoSpeed, 5, 80)
                     return 1
                 else:
                     if TargetData[4] == "LEFT":
                         RobotData = RobotMove(ROBOTRIGHT, 10, AutoSpeed, 0, 255)
-                        RobotData = RobotMove(ROBOTFORWARD, 30, AutoSpeed, 40, 80)
+                        RobotData = RobotMove(ROBOTFORWARD, 30, AutoSpeed, 20, 100)
                         RobotData = RobotMove(ROBOTLEFT, 10, AutoSpeed, 0, 255)
                         Result = AlignToTarget(Symbol)
                     else:
                         RobotData = RobotMove(ROBOTLEFT, 10, AutoSpeed, 0, 255)
-                        RobotData = RobotMove(ROBOTFORWARD, 30, AutoSpeed, 20, 80)
+                        RobotData = RobotMove(ROBOTFORWARD, 30, AutoSpeed, 20, 100)
                         RobotData = RobotMove(ROBOTRIGHT, 10, AutoSpeed, 0, 255)
                         Result = AlignToTarget(Symbol)
                     
