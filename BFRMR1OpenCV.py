@@ -148,7 +148,7 @@ def FindSymbol(ThresholdArray):
                             if match[0].distance < match[1].distance * 0.7:
                                 FoodMatches.append(match)
 
-                        if HomeMatches < 5 and FoodMatches < 5: #Not enough matches for either symbol
+                        if HomeMatches <= 8 and FoodMatches <= 8: #Not enough matches for either symbol
                             SymbolFound = -1
                         else:
                             if len(HomeMatches) == len(FoodMatches):
@@ -266,15 +266,6 @@ def CheckGround():
     if DisplayImage is True:
         cv2.imshow("camera", img)
         cv2.waitKey(10)
-
-
-
-
-
-
-
-
-
 
 
 ##################################################################################################

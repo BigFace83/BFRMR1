@@ -73,6 +73,7 @@ ROBOTRIGHT = 3
 ROBOTREVERSE = 4
 HEADMOVE = 5
 PLAYTONE = 6
+SONARSCAN = 7
 
 headpan = 128
 headtilt = 128
@@ -95,9 +96,9 @@ def HeadMove(pan,tilt,speed):
     panservovalue = int(128-(pan*1.45)) #convert from angle to value between 0 and 255
     tiltservovalue = int(128+(tilt*1.45))
     if speed <= 10:
-        BFRMR1serialport.sendserial([255, 255, HEADMOVE, panservovalue, tiltservovalue, speed, 0]) #send command to move head
+        BFRMR1serialport.sendserial([255, 255, HEADMOVE, panservovalue, tiltservovalue, speed, 0, 0]) #send command to move head
         while True:
-            a = BFRMR1serialport.getserial() #wait here until data is received to confirm command complete
+            a = BFRMR1serialport.getserial(10) #wait here until data is received to confirm command complete
             if a is not None:
                 break    
         return a #return data packet
@@ -120,9 +121,9 @@ def HeadMove(pan,tilt,speed):
 def RobotMove(direction,encodercount,speed, SonarThreshold, IRThreshold):
 
     # 3.4 degrees = 1 encoder count for a turn
-    BFRMR1serialport.sendserial([255, 255, direction, encodercount, speed, SonarThreshold, IRThreshold]) #send command to move head
+    BFRMR1serialport.sendserial([255, 255, direction, encodercount, speed, SonarThreshold, IRThreshold, 0]) #send command to move head
     while True:
-        a = BFRMR1serialport.getserial() #wait here until data is received to confirm command complete
+        a = BFRMR1serialport.getserial(10) #wait here until data is received to confirm command complete
         if a is not None:
             break 
        
@@ -135,13 +136,27 @@ def RobotMove(direction,encodercount,speed, SonarThreshold, IRThreshold):
 # Returns a packet of sensor data received from robot.
 ########################################################################################
 def GetData():
-    BFRMR1serialport.sendserial([255, 255, GETDATA, 0, 0, 0, 0]) #send command to get sensor data from robot
+    BFRMR1serialport.sendserial([255, 255, GETDATA, 0, 0, 0, 0, 0]) #send command to get sensor data from robot
     while True:
-        a = BFRMR1serialport.getserial() #wait here until data is received to confirm command complete
+        a = BFRMR1serialport.getserial(10) #wait here until data is received to confirm command complete
         if a is not None:
             break    
     return a #return data packet
-
+########################################################################################
+# SonarScan
+#
+########################################################################################
+def SonarScan(Tilt, StartAngle, EndAngle, Steps, Speed):
+    print "Sonar Scan"
+    ServoStart = int(128 - (StartAngle*1.45)) #convert from angle to value between 0 and 255
+    ServoEnd = int(128 - (EndAngle*1.45)) #convert from angle to value between 0 and 255
+    ServoTilt = int(128 + (Tilt*1.45)) #convert from angle to value between 0 and 255
+    BFRMR1serialport.sendserial([255, 255, SONARSCAN, ServoTilt, ServoStart , ServoEnd, Steps, Speed]) #send command to get sensor data from robot
+    while True:
+        a = BFRMR1serialport.getserial(Steps+2) #wait here until data is received to confirm command complete
+        if a is not None:
+            break    
+    return a #return data packet
 ########################################################################################
 # PlayTone
 #
@@ -149,7 +164,7 @@ def GetData():
 ########################################################################################
 
 def PlayTone(toneselection):
-    BFRMR1serialport.sendserial([255, 255, PLAYTONE, toneselection, 0, 0, 0]) #send command to play a tone
+    BFRMR1serialport.sendserial([255, 255, PLAYTONE, toneselection, 0, 0, 0, 0]) #send command to play a tone
     return
 
 ########################################################################################
@@ -263,10 +278,10 @@ def ScanForTarget(Symbol):
     returndata = -1
     #Scan area in front of robot looking for an image target
     HeadTiltAngle = 0
-    for y in range(-60,61,20):
+    for y in range(-80,81,20):
         HeadTiltAngle = 0
         HeadPanAngle = y
-        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 10)#Move head to next position
+        RobotData = HeadMove(HeadPanAngle,HeadTiltAngle, 9)#Move head to next position
         TargetData = CheckForTarget(Symbol,1)#Capture image and check for symbol
         if TargetData == -1:
             print (Fore.BLUE + "No Target In Image")
@@ -428,12 +443,20 @@ GPIO.add_event_detect(17, GPIO.FALLING, callback=Button1Pressed, bouncetime=200)
 GPIO.add_event_detect(27, GPIO.FALLING, callback=Button2Pressed, bouncetime=200)
 GPIO.add_event_detect(22, GPIO.FALLING, callback=Button3Pressed, bouncetime=200)
 
-
-print "Press button 0 to start"
 while True:
 
+    SonarData = SonarScan(-20, -80, 80, 30, 8)
+    print SonarData
+    SonarData = SonarScan(0, -80, 80, 30, 8)
+    print SonarData
+"""
+print "Press button 0 to start"
+while True:
+    
     while Run is True:
         TargetAquired = False
+        SonarData = SonarScan(-10, -80, 80, 30, 9)
+        print SonarData
         for x in range (0,3):
             Result = ScanForTarget("HOME")
             if Result == -1:
@@ -456,7 +479,7 @@ while True:
             Run = True
             print "Press button 0 to start"
 
-"""
+
 while True:
     ScanGround()
 """

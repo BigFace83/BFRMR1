@@ -90,7 +90,7 @@ void setup()
 void loop() 
 { 
   
-  if (Serial.available()>=7)
+  if (Serial.available()>=8)
   {
     
     digitalWrite(28, HIGH); //servo power relay on
@@ -109,17 +109,19 @@ void loop()
             Serial.read();
             Serial.read();
             Serial.read();
+            Serial.read();
             readsensors();
-            writeserialdata(datapacket);
+            writeserialdata(datapacket,8);
             break;
           case 1: //robot forward
             encodercount = Serial.read();
             wheelspeed = Serial.read();
             sonarthreshold = Serial.read();
             irthreshold = Serial.read();
+            Serial.read();
             robotdirection = 1;
             moverobot(robotdirection,encodercount, wheelspeed,sonarthreshold, irthreshold);
-            writeserialdata(datapacket);
+            writeserialdata(datapacket,8);
             leftencodertotal = 0; //after sending data, clear encoder totals
             rightencodertotal = 0;
             break;
@@ -128,9 +130,10 @@ void loop()
             wheelspeed = Serial.read();
             sonarthreshold = Serial.read();
             irthreshold = Serial.read();
+            Serial.read();
             robotdirection = 2;
             moverobot(robotdirection,encodercount, wheelspeed,sonarthreshold, irthreshold);
-            writeserialdata(datapacket);
+            writeserialdata(datapacket,8);
             leftencodertotal = 0; //after sending data, clear encoder totals
             rightencodertotal = 0;
             break;
@@ -139,9 +142,10 @@ void loop()
             wheelspeed = Serial.read();
             sonarthreshold = Serial.read();
             irthreshold = Serial.read();
+            Serial.read();
             robotdirection = 3;
             moverobot(robotdirection,encodercount, wheelspeed,sonarthreshold, irthreshold);
-            writeserialdata(datapacket);
+            writeserialdata(datapacket,8);
             leftencodertotal = 0; //after sending data, clear encoder totals
             rightencodertotal = 0;
             break;
@@ -150,9 +154,10 @@ void loop()
             wheelspeed = Serial.read();
             sonarthreshold = Serial.read();
             irthreshold = Serial.read();
+            Serial.read();
             robotdirection = 4;
             moverobot(robotdirection,encodercount, wheelspeed,sonarthreshold, irthreshold);
-            writeserialdata(datapacket);
+            writeserialdata(datapacket,8);
             leftencodertotal = 0; //after sending data, clear encoder totals
             rightencodertotal = 0;
             break;  
@@ -161,12 +166,14 @@ void loop()
             headtiltposition = Serial.read();
             headspeed = Serial.read();
             Serial.read();
+            Serial.read();
             movehead(headpanposition, headtiltposition, headspeed);          
             readsensors();
-            writeserialdata(datapacket);
+            writeserialdata(datapacket,8);
             break;
           case 6: //Play tone
             toneselection = Serial.read();
+            Serial.read();
             Serial.read();
             Serial.read();
             Serial.read();
@@ -176,9 +183,20 @@ void loop()
                 break;
               case 1:
                 playtone1();
-                break;  
-            }
-            break;    
+                break;
+             }
+             break; 
+           case 7: //Sonar Scan
+             unsigned char tiltangle = Serial.read();
+             unsigned char startangle = Serial.read();
+             unsigned char endangle = Serial.read();
+             unsigned char steps = Serial.read();
+             unsigned char scanspeed = Serial.read();
+             unsigned char sonararray[steps];
+             sonarscan(sonararray,tiltangle,startangle, endangle, steps, scanspeed); 
+             writeserialdata(sonararray,steps);
+             break;
+       
         }
       
       }
@@ -372,7 +390,39 @@ void moverobot(unsigned char robotdirection,unsigned char encodercount, unsigned
   }   
 }
 
-
+void sonarscan(unsigned char sonararray[], unsigned char tiltangle, unsigned char startangle, unsigned char endangle, unsigned char steps, unsigned char scanspeed)
+{
+  int stepsize = (endangle-startangle)/steps;
+  unsigned char headpanposition = startangle;
+  for(int i = 0; i<=steps; i++)
+  //for(int i = startangle;i<endangle;i=i+stepsize)
+  {
+    movehead(headpanposition, tiltangle, scanspeed);
+    unsigned char sonar = readsonar();
+    sonararray[i] = sonar;
+    headpanposition = headpanposition + stepsize;
+  }
+ 
+}
+unsigned char readsonar()
+{
+  //read head sonar sensor
+  pinMode(38, OUTPUT);
+  digitalWrite(38, LOW);             // Make sure pin is low before sending a short high to trigger ranging
+  delayMicroseconds(2);
+  digitalWrite(38, HIGH);            // Send a short 10 microsecond high burst on pin to start ranging
+  delayMicroseconds(10);
+  digitalWrite(38, LOW);             // Send pin low again before waiting for pulse back in
+  pinMode(38, INPUT);
+  int duration = pulseIn(38, HIGH);  // Reads echo pulse in from SRF05 in micro seconds
+  int sonar = (duration/58);      // Dividing this by 58 gives us a distance in cm
+  if(sonar > 255)
+  {
+    sonar = 255;
+  }
+  return sonar;
+}
+  
 void readsensors() //Read all of the sensors and form data into a packet ready to send
 {
   
@@ -383,20 +433,7 @@ void readsensors() //Read all of the sensors and form data into a packet ready t
   unsigned char headpanservo = analogRead(5)/4;
   unsigned char headtiltservo = analogRead(6)/4;
   
-  //read head sonar sensor
-  pinMode(38, OUTPUT);
-  digitalWrite(38, LOW);             // Make sure pin is low before sending a short high to trigger ranging
-  delayMicroseconds(2);
-  digitalWrite(38, HIGH);            // Send a short 10 microsecond high burst on pin to start ranging
-  delayMicroseconds(10);
-  digitalWrite(38, LOW);             // Send pin low again before waiting for pulse back in
-  pinMode(38, INPUT);
-  int duration = pulseIn(38, HIGH);  // Reads echo pulse in from SRF05 in micro seconds
-  int headsensor = (duration/58);      // Dividing this by 58 gives us a distance in cm
-  if(headsensor > 255)
-  {
-    headsensor = 255;
-  }
+  unsigned char sonar = readsonar();
   
   //form data into a data packet array
   datapacket[0] = leftlookingIR;
@@ -404,7 +441,7 @@ void readsensors() //Read all of the sensors and form data into a packet ready t
   datapacket[2] = rightlookingIR;
   datapacket[3] = headpanservo;
   datapacket[4] = headtiltservo;
-  datapacket[5] = headsensor;
+  datapacket[5] = sonar;
   datapacket[6] = leftencodertotal;  //send encoder totals, but reset to zero following send
   datapacket[7] = rightencodertotal; //encoder count sent to pc is total since last send
                  
@@ -415,12 +452,12 @@ void readsensors() //Read all of the sensors and form data into a packet ready t
 
 }
 
-void writeserialdata(unsigned char datapacket[])
+void writeserialdata(unsigned char datapacket[], int arraysize)
 {
       Serial.write(255);
       Serial.write(255);
 
-      for(int i = 0;i<8;i++)    //write datapacket values to serial
+      for(int i = 0;i<arraysize;i++)    //write datapacket values to serial
       {
         Serial.write(datapacket[i]);
       }
