@@ -1,4 +1,5 @@
 #include <Servo.h> 
+#include <math.h> 
 
 Servo leftwheel;
 Servo rightwheel;
@@ -392,15 +393,16 @@ void moverobot(unsigned char robotdirection,unsigned char encodercount, unsigned
 
 void sonarscan(unsigned char sonararray[], unsigned char tiltangle, unsigned char startangle, unsigned char endangle, unsigned char steps, unsigned char scanspeed)
 {
-  int stepsize = (endangle-startangle)/steps;
-  unsigned char headpanposition = startangle;
+  float stepsize = (startangle-endangle)/(float)steps;
+  float headpan = startangle;
+  
   for(int i = 0; i<=steps; i++)
-  //for(int i = startangle;i<endangle;i=i+stepsize)
   {
-    movehead(headpanposition, tiltangle, scanspeed);
+    movehead((unsigned char)headpan, tiltangle, scanspeed);
     unsigned char sonar = readsonar();
     sonararray[i] = sonar;
-    headpanposition = headpanposition + stepsize;
+    headpan = headpan - stepsize;
+
   }
  
 }
@@ -415,11 +417,12 @@ unsigned char readsonar()
   digitalWrite(38, LOW);             // Send pin low again before waiting for pulse back in
   pinMode(38, INPUT);
   int duration = pulseIn(38, HIGH);  // Reads echo pulse in from SRF05 in micro seconds
-  int sonar = (duration/58);      // Dividing this by 58 gives us a distance in cm
+  int sonar = (duration/58);         // Dividing this by 58 gives us a distance in cm
   if(sonar > 255)
   {
     sonar = 255;
   }
+  delay(10);
   return sonar;
 }
   
@@ -444,11 +447,8 @@ void readsensors() //Read all of the sensors and form data into a packet ready t
   datapacket[5] = sonar;
   datapacket[6] = leftencodertotal;  //send encoder totals, but reset to zero following send
   datapacket[7] = rightencodertotal; //encoder count sent to pc is total since last send
-                 
-  delay(10);
-  
+
   return;
-  
 
 }
 

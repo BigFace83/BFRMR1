@@ -145,13 +145,21 @@ def GetData():
 ########################################################################################
 # SonarScan
 #
+# Initiates a scan of the head and takes readings from the sonar sensor.
+# Arguements are:
+# -Head tilt angle in degrees
+# -Start angle in degrees - between 80 and -80 degrees
+# -End angle in degrees - between 80 and -80 degrees
+# -Number of steps in the scan
+# -Servo speed - 1-10 is a reasonable range 
+#
 ########################################################################################
 def SonarScan(Tilt, StartAngle, EndAngle, Steps, Speed):
     print "Sonar Scan"
     ServoStart = int(128 - (StartAngle*1.45)) #convert from angle to value between 0 and 255
     ServoEnd = int(128 - (EndAngle*1.45)) #convert from angle to value between 0 and 255
     ServoTilt = int(128 + (Tilt*1.45)) #convert from angle to value between 0 and 255
-    BFRMR1serialport.sendserial([255, 255, SONARSCAN, ServoTilt, ServoStart , ServoEnd, Steps, Speed]) #send command to get sensor data from robot
+    BFRMR1serialport.sendserial([255, 255, SONARSCAN, ServoTilt, ServoStart , ServoEnd, Steps, Speed]) #send command to start sonar scan
     while True:
         a = BFRMR1serialport.getserial(Steps+2) #wait here until data is received to confirm command complete
         if a is not None:
@@ -193,6 +201,7 @@ def MoveReverse():
 #
 # LookAtTarget - Turns head to centre target on the camera. X and Y arguements are camera
 # coordinates of target
+# Also takes current head servo angles as arguements
 # Returns new head servo angles
 #
 ########################################################################################
@@ -200,7 +209,6 @@ def LookAtTarget(X, Y, HeadPanAngle, HeadTiltAngle):
 
     print "Looking at Target"
     HeadAngles = []
-    PlayTone(0)
     XDist = X - 320.00
     XCamAngle = math.atan(XDist/640.00)
     YDist = 240.00 - Y
@@ -445,10 +453,9 @@ GPIO.add_event_detect(22, GPIO.FALLING, callback=Button3Pressed, bouncetime=200)
 
 while True:
 
-    SonarData = SonarScan(-20, -80, 80, 30, 8)
+    SonarData = SonarScan(0, -80, 80, 200, 8)
     print SonarData
-    SonarData = SonarScan(0, -80, 80, 30, 8)
-    print SonarData
+
 """
 print "Press button 0 to start"
 while True:
